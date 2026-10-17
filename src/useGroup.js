@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { loadRtcConfiguration } from "./useCast";
 
-export function useGroup() {
+export function useGroup({ meetingType = "group" } = {}) {
   const [online, setOnline] = useState(false);
   const [joining, setJoining] = useState(false);
   const [room, setRoom] = useState(null);
@@ -13,6 +13,7 @@ export function useGroup() {
   const [localScreen, setLocalScreen] = useState(null);
   const [mediaBusy, setMediaBusy] = useState(false);
   const [error, setError] = useState("");
+  const [messages, setMessages] = useState([]);
   const [retry, setRetry] = useState(0);
   const socketRef = useRef(null);
   const peersRef = useRef(new Map());
@@ -71,6 +72,7 @@ export function useGroup() {
     setMuted(true);
     setJoining(false);
     setMediaBusy(false);
+    setMessages([]);
   };
   const sendTracks = async (entry) => {
     for (const transceiver of entry.peer.getTransceivers()) {
@@ -180,6 +182,8 @@ export function useGroup() {
                 payload: entry.peer.localDescription.toJSON(),
               });
             }
+          } else if (message.type === "group-chat" && roomRef.current) {
+            setMessages((current) => [...current.slice(-199), message]);
           } else if (message.type === "group-member-joined") {
             setMembers((current) => [
               ...current.filter((member) => member.id !== message.member.id),
@@ -305,6 +309,7 @@ export function useGroup() {
           type: mode === "create" ? "group-create" : "group-join",
           name,
           code,
+          meetingType,
         })
       )
         throw new Error("Server is offline. Reconnect and try again.");
@@ -430,6 +435,10 @@ export function useGroup() {
     clearView();
     setError("");
   }
+  function sendMessage(text) {
+    if (!roomRef.current || !text.trim() || text.length > 2000) return false;
+    return send({ type: "group-chat", text: text.trim() });
+  }
   return {
     online,
     joining,
@@ -452,5 +461,7 @@ export function useGroup() {
       clearView();
       setRetry((current) => current + 1);
     },
+    messages,
+    sendMessage,
   };
 }

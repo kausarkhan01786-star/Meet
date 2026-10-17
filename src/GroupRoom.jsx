@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 import { useGroup } from "./useGroup";
 
-function MemberAudio({ stream, muted, name }) {
+export function MemberAudio({ stream, muted, name }) {
   const audioRef = useRef(null);
   const [blocked, setBlocked] = useState(false);
   useEffect(() => {
@@ -59,7 +59,7 @@ function MemberAudio({ stream, muted, name }) {
   );
 }
 
-function SharedScreen({ stream, name, local = false }) {
+export function SharedScreen({ stream, name, local = false }) {
   const videoRef = useRef(null);
   const tileRef = useRef(null);
   const [blocked, setBlocked] = useState(false);

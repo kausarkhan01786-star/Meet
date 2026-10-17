@@ -235,3 +235,47 @@ test("group codes are isolated from paired sessions and enforce capacity", async
   send(member, { type: "create" });
   assert.match((await receive(member)).message, /Leave/);
 });
+
+test("single meetings accept only two members and reject mismatched meeting types", async (context) => {
+  const { client, receive, send } = await setup(context);
+  const host = await client();
+  const receiver = await client();
+  const extra = await client();
+  send(host, { type: "group-create", name: "Host", meetingType: "single" });
+  const created = await receive(host);
+  assert.equal(created.limit, 2);
+  assert.equal(created.meetingType, "single");
+  send(extra, { type: "group-join", code: created.code, meetingType: "group" });
+  assert.match((await receive(extra)).message, /different meeting type/);
+  const noticed = receive(host);
+  send(receiver, { type: "group-join", code: created.code, meetingType: "single" });
+  assert.equal((await receive(receiver)).members.length, 1);
+  await noticed;
+  send(extra, { type: "group-join", code: created.code, meetingType: "single" });
+  assert.match((await receive(extra)).message, /full/);
+});
+
+test("meeting chat uses trusted sender identity, stays room-scoped and limits messages", async (context) => {
+  const { client, receive, send } = await setup(context);
+  const host = await client();
+  const member = await client();
+  const outsider = await client();
+  send(host, { type: "group-create", name: "Host" });
+  const room = await receive(host);
+  const noticed = receive(host);
+  send(member, { type: "group-join", code: room.code, name: "Member" });
+  const joined = await receive(member);
+  await noticed;
+  send(outsider, { type: "group-chat", code: room.code, text: "Unauthorized" });
+  const echo = receive(member);
+  send(member, { type: "group-chat", senderId: "spoof", name: "Spoof", text: "  Hello meeting  " });
+  const message = await receive(host);
+  assert.equal(message.type, "group-chat");
+  assert.equal(message.text, "Hello meeting");
+  assert.equal(message.name, "Member");
+  assert.equal(message.senderId, joined.selfId);
+  assert.equal(typeof message.sentAt, "number");
+  assert.equal((await echo).id, message.id);
+  send(member, { type: "group-chat", text: "x".repeat(2001) });
+  assert.match((await receive(member)).message, /2000/);
+});
