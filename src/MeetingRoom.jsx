@@ -200,7 +200,13 @@ function ChatPanel({ group, tab, setTab, onClose }) {
   );
 }
 
-export default function MeetingRoom({ meetingType = "group", onBack }) {
+export default function MeetingRoom({
+  meetingType = "group",
+  onBack,
+  minimized = false,
+  onMinimize,
+  onRestore,
+}) {
   const group = useGroup({ meetingType });
   const single = meetingType === "single";
   const [mode, setMode] = useState(null);
@@ -216,6 +222,20 @@ export default function MeetingRoom({ meetingType = "group", onBack }) {
   const creating = useRef(false);
   const copyTimer = useRef(null);
   const joinedAt = useRef(0);
+  const minimizedVideoRef = useRef(null);
+  const previewMember = group.members.find((member) => member.sharing);
+  const previewStream =
+    group.localScreen ||
+    (previewMember ? group.streams[previewMember.id] : null);
+  useEffect(() => {
+    const video = minimizedVideoRef.current;
+    if (!minimized || !previewStream || !video) return;
+    video.srcObject = previewStream;
+    video.play().catch(() => {});
+    return () => {
+      video.srcObject = null;
+    };
+  }, [minimized, previewStream]);
   useEffect(() => {
     if (mode === "create" && group.online && !group.room && !creating.current) {
       creating.current = true;
@@ -267,6 +287,10 @@ export default function MeetingRoom({ meetingType = "group", onBack }) {
     attemptedCode.current = "";
   }
   function home() {
+    if (group.room && onMinimize) {
+      onMinimize();
+      return;
+    }
     group.leave();
     onBack();
   }
@@ -287,530 +311,616 @@ export default function MeetingRoom({ meetingType = "group", onBack }) {
           : "Your people, all here."
         : "A conversation starts here.";
   return (
-    <div
-      className={`meeting-workspace ${chatOpen ? "has-sidebar" : ""} ${group.room ? "is-in-call" : ""}`}
-    >
-      <header className="meeting-header">
-        <button
-          className="workspace-brand"
-          onClick={home}
-          aria-label="Meeting home"
-        >
-          <AudioLines size={22} />
-          <span>
-            Meeting<span>.</span>
-          </span>
-        </button>
-        <span className="workspace-header-divider" />
-        <button
-          className="meeting-type-label"
-          onClick={() => {
-            if (mode || group.room) leave();
-            else home();
-          }}
-        >
-          <span className={`tiny-dot ${group.online ? "" : "is-offline"}`} />
-          {single ? "Single meeting" : "Group meeting"}
-          <ChevronDown size={13} />
-        </button>
-        {group.room && (
-          <>
-            <h1 className="header-room-title">{title}</h1>
-            <div className="room-code-box header-room-code">
-              <span>{single ? "PAIRING CODE" : "GROUP CODE"}</span>
-              <div>
-                <strong aria-label={`Meeting code ${group.room.code}`}>
-                  {group.room.code}
-                </strong>
-                <button
-                  className="m-icon"
-                  aria-label="Copy meeting code"
-                  title={copied ? "Copied" : "Copy code"}
-                  onClick={copyCode}
-                >
-                  {copied ? <Check size={16} /> : <Copy size={16} />}
-                </button>
-              </div>
-            </div>
-          </>
-        )}
-        <div className="header-end">
-          <span className="encryption-status">
-            <ShieldCheck size={14} /> Encrypted media
-          </span>
+    <>
+      <div
+        className={`meeting-workspace ${chatOpen ? "has-sidebar" : ""} ${group.room ? "is-in-call" : ""}`}
+        hidden={minimized}
+      >
+        <header className="meeting-header">
           <button
-            className={`m-icon ${chatOpen ? "is-active" : ""}`}
-            title="Open chat"
-            aria-label="Open chat"
+            className="workspace-brand"
+            onClick={home}
+            aria-label="Meeting home"
+          >
+            <AudioLines size={22} />
+            <span>
+              Meeting<span>.</span>
+            </span>
+          </button>
+          <span className="workspace-header-divider" />
+          <button
+            className="meeting-type-label"
             onClick={() => {
-              setTab("chat");
-              setChatOpen(!chatOpen);
+              if (group.room) home();
+              else if (mode) leave();
+              else home();
             }}
           >
-            <MessageSquare size={19} />
+            <span className={`tiny-dot ${group.online ? "" : "is-offline"}`} />
+            {single ? "Single meeting" : "Group meeting"}
+            <ChevronDown size={13} />
           </button>
-        </div>
-      </header>
-      <div className="meeting-workspace-body">
-        <main className="meeting-main">
-          {!group.room && (
+          {group.room && (
             <>
-              <div className="room-topline">
-                <button
-                  className="workspace-back"
-                  onClick={mode ? leave : home}
-                >
-                  <ArrowLeft size={14} />
-                  {mode ? "Meeting options" : "Back to the world"}
-                </button>
-                <span className="room-state">
-                  <span
-                    className={`tiny-dot ${connectedCount ? "" : "is-waiting"}`}
-                  />
-                  {connectedCount
-                    ? `${connectedCount + 1} connected`
-                    : group.room
-                      ? "Waiting for company"
-                      : group.joining
-                        ? "Connecting"
-                        : group.online
-                          ? "Ready to connect"
-                          : "Connecting to server"}
-                </span>
-              </div>
-              <section className="room-heading">
+              <h1 className="header-room-title">{title}</h1>
+              <div className="room-code-box header-room-code">
+                <span>{single ? "PAIRING CODE" : "GROUP CODE"}</span>
                 <div>
-                  <div className="room-eyebrow">
-                    {single ? "A LITTLE LESS DISTANCE" : "YOUR SHARED SPACE"}
-                  </div>
-                  <h1>{title}</h1>
-                  <p>
-                    {!mode
-                      ? "Choose how your next conversation begins."
-                      : group.room
-                        ? connectedCount
-                          ? "Your voices are connected. Your screens are next."
-                          : "A conversation is one code away."
-                        : mode === "create"
-                          ? "Preparing your private room..."
-                          : "Enter a six-digit code to connect."}
-                  </p>
+                  <strong aria-label={`Meeting code ${group.room.code}`}>
+                    {group.room.code}
+                  </strong>
+                  <button
+                    className="m-icon"
+                    aria-label="Copy meeting code"
+                    title={copied ? "Copied" : "Copy code"}
+                    onClick={copyCode}
+                  >
+                    {copied ? <Check size={16} /> : <Copy size={16} />}
+                  </button>
                 </div>
-              </section>
+              </div>
             </>
           )}
-          {!mode ? (
-            <section className="meeting-entry">
-              <label className="entry-name-label" htmlFor="display-name">
-                YOUR NAME <span>OPTIONAL</span>
-              </label>
-              <input
-                className="meeting-name-input"
-                id="display-name"
-                placeholder="What should we call you?"
-                maxLength={40}
-                autoComplete="nickname"
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-              />
-              <div className="entry-choice-grid">
-                <button
-                  className="entry-choice"
-                  onClick={() => {
-                    creating.current = false;
-                    setMode("create");
-                  }}
-                >
-                  <span className="entry-choice-icon">
-                    <Plus size={25} strokeWidth={1.3} />
-                  </span>
-                  <strong>
-                    {single ? "Create call" : "Create group"}
-                    <ArrowUpRightIcon />
-                  </strong>
-                  <small>
-                    {single
-                      ? "Make a little space for someone."
-                      : "One code. Everyone you want here."}
-                  </small>
-                  <span className="entry-choice-bottom">
-                    {single ? "Start your conversation" : "Start your group"}
-                    <ArrowRight size={17} />
-                  </span>
-                </button>
-                <button
-                  className="entry-choice receive-entry"
-                  onClick={() => setMode("join")}
-                >
-                  <span className="entry-choice-icon">
-                    <LogIn size={25} strokeWidth={1.3} />
-                  </span>
-                  <strong>
-                    {single ? "Receive call" : "Add group"}
-                    <ArrowUpRightIcon />
-                  </strong>
-                  <small>
-                    {single
-                      ? "Someone is waiting on the other side."
-                      : "Your people have a place for you."}
-                  </small>
-                  <span className="entry-choice-bottom">
-                    {single ? "Enter a pairing code" : "Join with a group code"}
-                    <ArrowRight size={17} />
-                  </span>
-                </button>
-              </div>
-            </section>
-          ) : !group.room ? (
-            <div className="meeting-join-stage">
-              {mode === "join" ? (
-                <form
-                  className="receive-call-form"
-                  onSubmit={(event) => {
-                    event.preventDefault();
-                    group.enter("join", name.trim() || "Guest", code);
-                  }}
-                >
-                  <div className="receive-call-symbol">
-                    <Phone size={31} strokeWidth={1.2} />
-                  </div>
-                  <h2>
-                    {single
-                      ? "You're six digits away."
-                      : "Your group is six digits away."}
-                  </h2>
-                  <label htmlFor="meeting-code">
-                    {single ? "PAIRING CODE" : "GROUP CODE"}
-                  </label>
-                  <input
-                    autoFocus
-                    id="meeting-code"
-                    inputMode="numeric"
-                    autoComplete="off"
-                    maxLength={6}
-                    pattern="[0-9]{6}"
-                    placeholder="000000"
-                    value={code}
-                    disabled={group.joining}
-                    required
-                    onChange={(event) =>
-                      setCode(event.target.value.replace(/\D/g, "").slice(0, 6))
-                    }
-                  />
+          <div className="header-end">
+            <span className="encryption-status">
+              <ShieldCheck size={14} /> Encrypted media
+            </span>
+            <button
+              className={`m-icon ${chatOpen ? "is-active" : ""}`}
+              title="Open chat"
+              aria-label="Open chat"
+              onClick={() => {
+                setTab("chat");
+                setChatOpen(!chatOpen);
+              }}
+            >
+              <MessageSquare size={19} />
+            </button>
+          </div>
+        </header>
+        <div className="meeting-workspace-body">
+          <main className="meeting-main">
+            {!group.room && (
+              <>
+                <div className="room-topline">
                   <button
-                    className="connect-call-button"
-                    disabled={
-                      !group.online || group.joining || code.length !== 6
-                    }
+                    className="workspace-back"
+                    onClick={mode ? leave : home}
                   >
-                    {group.joining ? (
-                      <LoaderCircle className="spin" size={16} />
-                    ) : (
-                      <ArrowRight size={16} />
-                    )}
-                    {group.joining ? "Connecting..." : "Connect"}
+                    <ArrowLeft size={14} />
+                    {mode ? "Meeting options" : "Back to the world"}
                   </button>
-                  <span className="join-secure">
-                    <LockKeyhole size={12} /> The code stays between your
-                    people.
+                  <span className="room-state">
+                    <span
+                      className={`tiny-dot ${connectedCount ? "" : "is-waiting"}`}
+                    />
+                    {connectedCount
+                      ? `${connectedCount + 1} connected`
+                      : group.room
+                        ? "Waiting for company"
+                        : group.joining
+                          ? "Connecting"
+                          : group.online
+                            ? "Ready to connect"
+                            : "Connecting to server"}
                   </span>
-                </form>
-              ) : (
-                <div className="room-preparing">
-                  <AudioLines size={45} strokeWidth={1} />
-                  <h2>
-                    {group.joining
-                      ? "Finding a little room..."
-                      : group.error
-                        ? "Let's try that again."
-                        : "Preparing your room..."}
-                  </h2>
-                  {!group.joining && (
+                </div>
+                <section className="room-heading">
+                  <div>
+                    <div className="room-eyebrow">
+                      {single ? "A LITTLE LESS DISTANCE" : "YOUR SHARED SPACE"}
+                    </div>
+                    <h1>{title}</h1>
+                    <p>
+                      {!mode
+                        ? "Choose how your next conversation begins."
+                        : group.room
+                          ? connectedCount
+                            ? "Your voices are connected. Your screens are next."
+                            : "A conversation is one code away."
+                          : mode === "create"
+                            ? "Preparing your private room..."
+                            : "Enter a six-digit code to connect."}
+                    </p>
+                  </div>
+                </section>
+              </>
+            )}
+            {!mode ? (
+              <section className="meeting-entry">
+                <label className="entry-name-label" htmlFor="display-name">
+                  YOUR NAME <span>OPTIONAL</span>
+                </label>
+                <input
+                  className="meeting-name-input"
+                  id="display-name"
+                  placeholder="What should we call you?"
+                  maxLength={40}
+                  autoComplete="nickname"
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                />
+                <div className="entry-choice-grid">
+                  <button
+                    className="entry-choice"
+                    onClick={() => {
+                      creating.current = false;
+                      setMode("create");
+                    }}
+                  >
+                    <span className="entry-choice-icon">
+                      <Plus size={25} strokeWidth={1.3} />
+                    </span>
+                    <strong>
+                      {single ? "Create call" : "Create group"}
+                      <ArrowUpRightIcon />
+                    </strong>
+                    <small>
+                      {single
+                        ? "Make a little space for someone."
+                        : "One code. Everyone you want here."}
+                    </small>
+                    <span className="entry-choice-bottom">
+                      {single ? "Start your conversation" : "Start your group"}
+                      <ArrowRight size={17} />
+                    </span>
+                  </button>
+                  <button
+                    className="entry-choice receive-entry"
+                    onClick={() => setMode("join")}
+                  >
+                    <span className="entry-choice-icon">
+                      <LogIn size={25} strokeWidth={1.3} />
+                    </span>
+                    <strong>
+                      {single ? "Receive call" : "Add group"}
+                      <ArrowUpRightIcon />
+                    </strong>
+                    <small>
+                      {single
+                        ? "Someone is waiting on the other side."
+                        : "Your people have a place for you."}
+                    </small>
+                    <span className="entry-choice-bottom">
+                      {single
+                        ? "Enter a pairing code"
+                        : "Join with a group code"}
+                      <ArrowRight size={17} />
+                    </span>
+                  </button>
+                </div>
+              </section>
+            ) : !group.room ? (
+              <div className="meeting-join-stage">
+                {mode === "join" ? (
+                  <form
+                    className="receive-call-form"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      group.enter("join", name.trim() || "Guest", code);
+                    }}
+                  >
+                    <div className="receive-call-symbol">
+                      <Phone size={31} strokeWidth={1.2} />
+                    </div>
+                    <h2>
+                      {single
+                        ? "You're six digits away."
+                        : "Your group is six digits away."}
+                    </h2>
+                    <label htmlFor="meeting-code">
+                      {single ? "PAIRING CODE" : "GROUP CODE"}
+                    </label>
+                    <input
+                      autoFocus
+                      id="meeting-code"
+                      inputMode="numeric"
+                      autoComplete="off"
+                      maxLength={6}
+                      pattern="[0-9]{6}"
+                      placeholder="000000"
+                      value={code}
+                      disabled={group.joining}
+                      required
+                      onChange={(event) =>
+                        setCode(
+                          event.target.value.replace(/\D/g, "").slice(0, 6),
+                        )
+                      }
+                    />
                     <button
                       className="connect-call-button"
-                      disabled={!group.online}
-                      onClick={() =>
-                        group.enter("create", name.trim() || "Host", "")
+                      disabled={
+                        !group.online || group.joining || code.length !== 6
                       }
                     >
-                      <Plus size={15} /> Create {single ? "call" : "group"}
+                      {group.joining ? (
+                        <LoaderCircle className="spin" size={16} />
+                      ) : (
+                        <ArrowRight size={16} />
+                      )}
+                      {group.joining ? "Connecting..." : "Connect"}
                     </button>
-                  )}
-                </div>
-              )}
-            </div>
-          ) : (
-            <section
-              className={`meeting-stage ${screenCount ? "is-screen-stage" : ""}`}
-              aria-label="Call stage"
-            >
-              {screenCount ? (
-                <div className="meeting-screens">
-                  {group.sharing && (
-                    <SharedScreen stream={group.localScreen} name="You" local />
-                  )}
-                  {screenMembers.map((member) => (
-                    <SharedScreen
-                      key={member.id}
-                      stream={group.streams[member.id]}
-                      name={member.name}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div className="voice-room">
-                  <div className="voice-room-top">
-                    <span className="voice-live">
-                      <AudioLines size={13} />{" "}
-                      {connectedCount ? "VOICE CONNECTED" : "YOUR ROOM IS OPEN"}
+                    <span className="join-secure">
+                      <LockKeyhole size={12} /> The code stays between your
+                      people.
                     </span>
-                    <span>
-                      {String(Math.floor(elapsed / 60)).padStart(2, "0")}:
-                      {String(elapsed % 60).padStart(2, "0")}
-                    </span>
+                  </form>
+                ) : (
+                  <div className="room-preparing">
+                    <AudioLines size={45} strokeWidth={1} />
+                    <h2>
+                      {group.joining
+                        ? "Finding a little room..."
+                        : group.error
+                          ? "Let's try that again."
+                          : "Preparing your room..."}
+                    </h2>
+                    {!group.joining && (
+                      <button
+                        className="connect-call-button"
+                        disabled={!group.online}
+                        onClick={() =>
+                          group.enter("create", name.trim() || "Host", "")
+                        }
+                      >
+                        <Plus size={15} /> Create {single ? "call" : "group"}
+                      </button>
+                    )}
                   </div>
-                  <div className="voice-members">
-                    <div
-                      className={`voice-person ${group.muted ? "is-muted" : ""}`}
-                    >
-                      <div className="voice-avatar">
-                        <span>
-                          {(
-                            name.trim() ||
-                            (mode === "create" ? "Host" : "Guest")
-                          )
-                            .slice(0, 2)
-                            .toUpperCase()}
-                        </span>
-                        <i />
-                        <i />
-                        <i />
-                      </div>
-                      <strong>
-                        You{" "}
-                        <span>
-                          {group.muted ? (
-                            <MicOff size={12} />
-                          ) : (
-                            <Mic size={12} />
-                          )}
-                        </span>
-                      </strong>
-                      <small>
-                        {group.muted ? "Microphone off" : "Microphone on"}
-                      </small>
-                    </div>
-                    {group.members.map((member, index) => (
-                      <div
-                        className={`voice-person tone-${index % 3} ${member.muted ? "is-muted" : ""}`}
+                )}
+              </div>
+            ) : (
+              <section
+                className={`meeting-stage ${screenCount ? "is-screen-stage" : ""}`}
+                aria-label="Call stage"
+              >
+                {screenCount ? (
+                  <div className="meeting-screens">
+                    {group.sharing && (
+                      <SharedScreen
+                        stream={group.localScreen}
+                        name="You"
+                        local
+                      />
+                    )}
+                    {screenMembers.map((member) => (
+                      <SharedScreen
                         key={member.id}
+                        stream={group.streams[member.id]}
+                        name={member.name}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="voice-room">
+                    <div className="voice-room-top">
+                      <span className="voice-live">
+                        <AudioLines size={13} />{" "}
+                        {connectedCount
+                          ? "VOICE CONNECTED"
+                          : "YOUR ROOM IS OPEN"}
+                      </span>
+                      <span>
+                        {String(Math.floor(elapsed / 60)).padStart(2, "0")}:
+                        {String(elapsed % 60).padStart(2, "0")}
+                      </span>
+                    </div>
+                    <div className="voice-members">
+                      <div
+                        className={`voice-person ${group.muted ? "is-muted" : ""}`}
                       >
                         <div className="voice-avatar">
-                          <span>{member.name.slice(0, 2).toUpperCase()}</span>
+                          <span>
+                            {(
+                              name.trim() ||
+                              (mode === "create" ? "Host" : "Guest")
+                            )
+                              .slice(0, 2)
+                              .toUpperCase()}
+                          </span>
                           <i />
                           <i />
                           <i />
                         </div>
                         <strong>
-                          {member.name}
-                          {member.muted && <MicOff size={12} />}
+                          You{" "}
+                          <span>
+                            {group.muted ? (
+                              <MicOff size={12} />
+                            ) : (
+                              <Mic size={12} />
+                            )}
+                          </span>
                         </strong>
                         <small>
-                          {group.connections[member.id] === "connected"
-                            ? "Connected"
-                            : "Connecting..."}
+                          {group.muted ? "Microphone off" : "Microphone on"}
                         </small>
                       </div>
-                    ))}
+                      {group.members.map((member, index) => (
+                        <div
+                          className={`voice-person tone-${index % 3} ${member.muted ? "is-muted" : ""}`}
+                          key={member.id}
+                        >
+                          <div className="voice-avatar">
+                            <span>{member.name.slice(0, 2).toUpperCase()}</span>
+                            <i />
+                            <i />
+                            <i />
+                          </div>
+                          <strong>
+                            {member.name}
+                            {member.muted && <MicOff size={12} />}
+                          </strong>
+                          <small>
+                            {group.connections[member.id] === "connected"
+                              ? "Connected"
+                              : "Connecting..."}
+                          </small>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="voice-room-message">
+                      <h2>
+                        {connectedCount
+                          ? "This is what closer sounds like."
+                          : "A little company, one code away."}
+                      </h2>
+                      <p>
+                        {connectedCount
+                          ? "No screen shared. Just a good conversation."
+                          : "Your meeting is ready for someone to join."}
+                      </p>
+                    </div>
+                    <div className="voice-room-bottom">
+                      <LockKeyhole size={12} />
+                      <span>
+                        {single
+                          ? "JUST THE TWO OF YOU"
+                          : `UP TO ${group.room.limit} PEOPLE`}
+                      </span>
+                      <span className="voice-bottom-rule" />
+                      <Headphones size={12} />
+                      <span>VOICE & SCREEN</span>
+                    </div>
                   </div>
-                  <div className="voice-room-message">
-                    <h2>
-                      {connectedCount
-                        ? "This is what closer sounds like."
-                        : "A little company, one code away."}
-                    </h2>
-                    <p>
-                      {connectedCount
-                        ? "No screen shared. Just a good conversation."
-                        : "Your meeting is ready for someone to join."}
-                    </p>
-                  </div>
-                  <div className="voice-room-bottom">
-                    <LockKeyhole size={12} />
+                )}
+              </section>
+            )}
+            {group.error && (
+              <div className="meeting-error" role="alert">
+                <span>{group.error}</span>
+                {!group.online && (
+                  <button onClick={group.reconnect}>Reconnect</button>
+                )}
+                <button
+                  className="m-icon"
+                  aria-label="Dismiss meeting error"
+                  onClick={() => group.setError("")}
+                >
+                  <X size={15} />
+                </button>
+              </div>
+            )}
+            <div className="call-bottom-bar">
+              <div className="call-bottom-info">
+                <LockKeyhole size={12} />
+                <span>{single ? "Single meeting" : "Group meeting"}</span>
+                {group.room && (
+                  <>
+                    <span className="bottom-dot" />
                     <span>
-                      {single
-                        ? "JUST THE TWO OF YOU"
-                        : `UP TO ${group.room.limit} PEOPLE`}
+                      {String(Math.floor(elapsed / 60)).padStart(2, "0")}:
+                      {String(elapsed % 60).padStart(2, "0")}
                     </span>
-                    <span className="voice-bottom-rule" />
-                    <Headphones size={12} />
-                    <span>VOICE & SCREEN</span>
-                  </div>
-                </div>
-              )}
-            </section>
-          )}
-          {group.error && (
-            <div className="meeting-error" role="alert">
-              <span>{group.error}</span>
-              {!group.online && (
-                <button onClick={group.reconnect}>Reconnect</button>
-              )}
-              <button
-                className="m-icon"
-                aria-label="Dismiss meeting error"
-                onClick={() => group.setError("")}
-              >
-                <X size={15} />
-              </button>
-            </div>
-          )}
-          <div className="call-bottom-bar">
-            <div className="call-bottom-info">
-              <LockKeyhole size={12} />
-              <span>{single ? "Single meeting" : "Group meeting"}</span>
-              {group.room && (
-                <>
-                  <span className="bottom-dot" />
-                  <span>
-                    {String(Math.floor(elapsed / 60)).padStart(2, "0")}:
-                    {String(elapsed % 60).padStart(2, "0")}
-                  </span>
-                </>
-              )}
-            </div>
-            <div className="call-controls">
-              <button
-                className={`call-control ${group.muted ? "control-off" : ""}`}
-                aria-label={
-                  group.muted ? "Unmute microphone" : "Mute microphone"
-                }
-                title={group.muted ? "Unmute microphone" : "Mute microphone"}
-                disabled={!group.room || group.mediaBusy}
-                onClick={group.toggleMic}
-              >
-                {group.muted ? <MicOff size={20} /> : <Mic size={20} />}
-              </button>
-              <button
-                className={`call-control ${speakersMuted ? "control-off" : ""}`}
-                title={speakersMuted ? "Unmute speakers" : "Mute speakers"}
-                aria-label={speakersMuted ? "Unmute speakers" : "Mute speakers"}
-                onClick={() => setSpeakersMuted(!speakersMuted)}
-              >
-                {speakersMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
-              </button>
-              <span className="controls-divider" />
-              <button
-                className={`call-control share-control ${group.sharing ? "is-sharing" : ""}`}
-                title={group.sharing ? "Stop sharing" : "Share screen"}
-                aria-label={group.sharing ? "Stop sharing" : "Share screen"}
-                disabled={!group.room || group.mediaBusy}
-                onClick={group.shareScreen}
-              >
-                {group.mediaBusy ? (
-                  <LoaderCircle className="spin" size={19} />
-                ) : (
-                  <MonitorUp size={20} />
+                  </>
                 )}
-                <span>{group.sharing ? "Stop sharing" : "Share screen"}</span>
-              </button>
-              <button
-                className="call-control more-control"
-                title="Call details"
-                aria-label="Call details"
-                onClick={() => setSettingsOpen(!settingsOpen)}
-              >
-                <MoreHorizontal size={21} />
-              </button>
-              <span className="controls-divider" />
-              <button
-                className="call-control hang-up"
-                title="Leave meeting"
-                aria-label="Leave meeting"
-                onClick={group.room || mode ? leave : home}
-              >
-                <PhoneOff size={20} />
-              </button>
+              </div>
+              <div className="call-controls">
+                <button
+                  className={`call-control ${group.muted ? "control-off" : ""}`}
+                  aria-label={
+                    group.muted ? "Unmute microphone" : "Mute microphone"
+                  }
+                  title={group.muted ? "Unmute microphone" : "Mute microphone"}
+                  disabled={!group.room || group.mediaBusy}
+                  onClick={group.toggleMic}
+                >
+                  {group.muted ? <MicOff size={20} /> : <Mic size={20} />}
+                </button>
+                <button
+                  className={`call-control ${speakersMuted ? "control-off" : ""}`}
+                  title={speakersMuted ? "Unmute speakers" : "Mute speakers"}
+                  aria-label={
+                    speakersMuted ? "Unmute speakers" : "Mute speakers"
+                  }
+                  onClick={() => setSpeakersMuted(!speakersMuted)}
+                >
+                  {speakersMuted ? (
+                    <VolumeX size={20} />
+                  ) : (
+                    <Volume2 size={20} />
+                  )}
+                </button>
+                <span className="controls-divider" />
+                <button
+                  className={`call-control share-control ${group.sharing ? "is-sharing" : ""}`}
+                  title={group.sharing ? "Stop sharing" : "Share screen"}
+                  aria-label={group.sharing ? "Stop sharing" : "Share screen"}
+                  disabled={!group.room || group.mediaBusy}
+                  onClick={group.shareScreen}
+                >
+                  {group.mediaBusy ? (
+                    <LoaderCircle className="spin" size={19} />
+                  ) : (
+                    <MonitorUp size={20} />
+                  )}
+                  <span>{group.sharing ? "Stop sharing" : "Share screen"}</span>
+                </button>
+                <button
+                  className="call-control more-control"
+                  title="Call details"
+                  aria-label="Call details"
+                  onClick={() => setSettingsOpen(!settingsOpen)}
+                >
+                  <MoreHorizontal size={21} />
+                </button>
+                <span className="controls-divider" />
+                <button
+                  className="call-control hang-up"
+                  title="Leave meeting"
+                  aria-label="Leave meeting"
+                  onClick={group.room || mode ? leave : home}
+                >
+                  <PhoneOff size={20} />
+                </button>
+              </div>
+              <div className="call-bottom-panels">
+                <button
+                  className="m-icon"
+                  title="Participants"
+                  aria-label="Participants"
+                  onClick={() => {
+                    setTab("people");
+                    setChatOpen(true);
+                  }}
+                >
+                  <Users size={18} />
+                </button>
+                <button
+                  className={`m-icon ${chatOpen ? "is-active" : ""}`}
+                  title="Chat"
+                  aria-label="Chat"
+                  onClick={() => {
+                    setTab("chat");
+                    setChatOpen(!chatOpen);
+                  }}
+                >
+                  <MessageSquare size={18} />
+                  {group.messages.length > 0 && (
+                    <span className="chat-count">{group.messages.length}</span>
+                  )}
+                </button>
+              </div>
             </div>
-            <div className="call-bottom-panels">
+            {settingsOpen && (
+              <div className="call-details" role="status">
+                <strong>
+                  <ShieldCheck size={15} /> Meeting details
+                </strong>
+                <p>
+                  {single
+                    ? "Two-way voice, with up to two people."
+                    : "Multi-way voice, with up to six people."}{" "}
+                  Screen sharing uses your browser's screen picker. Public HTTPS
+                  and TURN are required for restricted networks.
+                </p>
+                <button
+                  className="m-icon"
+                  title="Close details"
+                  aria-label="Close details"
+                  onClick={() => setSettingsOpen(false)}
+                >
+                  <X size={15} />
+                </button>
+              </div>
+            )}
+          </main>
+          {chatOpen && (
+            <>
               <button
-                className="m-icon"
-                title="Participants"
-                aria-label="Participants"
-                onClick={() => {
-                  setTab("people");
-                  setChatOpen(true);
-                }}
-              >
-                <Users size={18} />
-              </button>
-              <button
-                className={`m-icon ${chatOpen ? "is-active" : ""}`}
-                title="Chat"
-                aria-label="Chat"
-                onClick={() => {
-                  setTab("chat");
-                  setChatOpen(!chatOpen);
-                }}
-              >
-                <MessageSquare size={18} />
-                {group.messages.length > 0 && (
-                  <span className="chat-count">{group.messages.length}</span>
-                )}
-              </button>
-            </div>
-          </div>
-          {settingsOpen && (
-            <div className="call-details" role="status">
-              <strong>
-                <ShieldCheck size={15} /> Meeting details
-              </strong>
-              <p>
-                {single
-                  ? "Two-way voice, with up to two people."
-                  : "Multi-way voice, with up to six people."}{" "}
-                Screen sharing uses your browser's screen picker. Public HTTPS
-                and TURN are required for restricted networks.
-              </p>
-              <button
-                className="m-icon"
-                title="Close details"
-                aria-label="Close details"
-                onClick={() => setSettingsOpen(false)}
-              >
-                <X size={15} />
-              </button>
-            </div>
+                className="sidebar-scrim"
+                aria-label="Close sidebar"
+                onClick={() => setChatOpen(false)}
+              />
+              <ChatPanel
+                group={group}
+                tab={tab}
+                setTab={setTab}
+                onClose={() => setChatOpen(false)}
+              />
+            </>
           )}
-        </main>
-        {chatOpen && (
-          <>
+        </div>
+        <div className="remote-audio-elements">
+          {group.members.map((member) => (
+            <div key={member.id}>
+              <MemberAudio
+                stream={group.streams[member.id]}
+                muted={speakersMuted}
+                name={member.name}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+      {minimized && (
+        <section className="minimized-call" aria-label="Minimized meeting">
+          <button
+            className="minimized-call-restore"
+            onClick={onRestore}
+            aria-label="Return to meeting"
+          >
+            <span className="minimized-call-avatar">
+              {previewStream ? (
+                <video
+                  ref={minimizedVideoRef}
+                  autoPlay
+                  muted
+                  playsInline
+                  aria-label="Minimized screen preview"
+                />
+              ) : (
+                <AudioLines size={25} />
+              )}
+            </span>
+            <span className="minimized-call-copy">
+              <strong>{single ? "Single meeting" : "Group meeting"}</strong>
+              <small>
+                <span className="tiny-dot" />
+                {group.room
+                  ? `${group.members.length + 1} in call`
+                  : group.online
+                    ? "Call ended"
+                    : "Disconnected"}{" "}
+                <span>/</span>{" "}
+                {String(Math.floor(elapsed / 60)).padStart(2, "0")}:
+                {String(elapsed % 60).padStart(2, "0")}
+              </small>
+              <span>
+                Return to call <ArrowRight size={12} />
+              </span>
+            </span>
+          </button>
+          <div className="minimized-call-controls">
             <button
-              className="sidebar-scrim"
-              aria-label="Close sidebar"
-              onClick={() => setChatOpen(false)}
-            />
-            <ChatPanel
-              group={group}
-              tab={tab}
-              setTab={setTab}
-              onClose={() => setChatOpen(false)}
-            />
-          </>
-        )}
-      </div>
-      <div className="remote-audio-elements">
-        {group.members.map((member) => (
-          <div key={member.id}>
-            <MemberAudio
-              stream={group.streams[member.id]}
-              muted={speakersMuted}
-              name={member.name}
-            />
+              className="m-icon"
+              disabled={!group.room || group.mediaBusy}
+              onClick={group.toggleMic}
+              aria-label={
+                group.muted
+                  ? "Unmute minimized microphone"
+                  : "Mute minimized microphone"
+              }
+              title={group.muted ? "Unmute microphone" : "Mute microphone"}
+            >
+              {group.muted ? <MicOff size={17} /> : <Mic size={17} />}
+            </button>
+            <button
+              className="m-icon minimized-call-end"
+              onClick={() => {
+                leave();
+                onBack();
+              }}
+              aria-label="End minimized meeting"
+              title="Leave meeting"
+            >
+              <PhoneOff size={18} />
+            </button>
           </div>
-        ))}
-      </div>
-    </div>
+        </section>
+      )}
+    </>
   );
 }
 

@@ -160,7 +160,7 @@ test("groups admit multiple members, relay targeted messages and survive creator
   send(second, { type: "group-join", code: created.code, name: "Second" });
   const joined = await receive(second);
   assert.deepEqual(joined.members, [
-    { id: created.selfId, name: "Creator", muted: true, sharing: false },
+    { id: created.selfId, name: "Creator", muted: true, sharing: false, camera: false },
   ]);
   await creatorNotice;
   const creatorThird = receive(creator);
@@ -172,13 +172,14 @@ test("groups admit multiple members, relay targeted messages and survive creator
   await secondThird;
   const creatorMedia = receive(creator);
   const thirdMedia = receive(third);
-  send(second, { type: "group-media", muted: false, sharing: true });
+  send(second, { type: "group-media", muted: false, sharing: true, camera: true });
   assert.deepEqual(await thirdMedia, {
     type: "group-member-media",
     id: joined.selfId,
     name: "Second",
     muted: false,
     sharing: true,
+    camera: true,
   });
   await creatorMedia;
   send(second, {
@@ -234,6 +235,25 @@ test("group codes are isolated from paired sessions and enforce capacity", async
   assert.match((await receive(extra)).message, /full/);
   send(member, { type: "create" });
   assert.match((await receive(member)).message, /Leave/);
+});
+
+test("late joiners receive camera status without replacing screen-sharing status", async (context) => {
+  const { client, receive, send } = await setup(context);
+  const host = await client();
+  const guest = await client();
+  send(host, { type: "group-create", name: "Host" });
+  const { code } = await receive(host);
+  send(host, { type: "group-media", muted: false, sharing: true, camera: true });
+  const noticed = receive(host);
+  send(guest, { type: "group-join", code });
+  const room = await receive(guest);
+  assert.equal(room.members[0].camera, true);
+  assert.equal(room.members[0].sharing, true);
+  await noticed;
+  send(host, { type: "group-media", muted: false, sharing: true, camera: false });
+  const update = await receive(guest);
+  assert.equal(update.camera, false);
+  assert.equal(update.sharing, true);
 });
 
 test("single meetings accept only two members and reject mismatched meeting types", async (context) => {

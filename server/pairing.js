@@ -21,6 +21,7 @@ export function createPairingService({
     name: socket.memberName,
     muted: socket.groupMuted ?? true,
     sharing: Boolean(socket.groupSharing),
+    camera: Boolean(socket.groupCamera),
   });
   const broadcastGroup = (group, message, exclude) => {
     for (const member of group.members.values()) {
@@ -58,6 +59,7 @@ export function createPairingService({
       socket.memberName = undefined;
       socket.groupMuted = undefined;
       socket.groupSharing = undefined;
+      socket.groupCamera = undefined;
     }
     const room = rooms.get(socket.roomCode);
     if (!room) return;
@@ -214,11 +216,13 @@ export function createPairingService({
           if (
             !group ||
             typeof message.muted !== "boolean" ||
-            typeof message.sharing !== "boolean"
+            typeof message.sharing !== "boolean" ||
+            (message.camera !== undefined && typeof message.camera !== "boolean")
           )
             return;
           socket.groupMuted = message.muted;
           socket.groupSharing = message.sharing;
+          socket.groupCamera = message.camera === true;
           broadcastGroup(
             group,
             { type: "group-member-media", ...memberInfo(socket) },

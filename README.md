@@ -26,7 +26,8 @@ The hero contains **Add Meeting**, which reveals **Single meeting** and **Group 
 2. Give the website address and code only to the intended people. They select **Add Meeting > Group meeting > Add group**. Entering all six digits starts joining automatically; **Connect** can retry a rejected code.
 3. Everyone can talk and listen at the same time. Use the microphone button to mute/unmute yourself and the speaker button to mute/unmute playback on your device. If autoplay is blocked, press the member's **Hear** button.
 4. Any member using a supported desktop Chrome/Edge browser can press **Share screen**. Multiple members can share simultaneously; their screen tiles appear separately with fullscreen controls. Screen sharing here sends video only; voices are carried by each member's microphone. Phones can join voice and view screens, but mobile browser screen capture is generally unavailable.
-5. **Stop sharing** ends only your screen, not the voice call. **Leave meeting**, returning home, closing the tab, or losing signaling releases your microphone/screen and peer connections.
+5. **Stop sharing** ends only your screen, not the voice call. Clicking **Meeting home** or the active meeting header returns to the hero while keeping the call, microphone, screen sharing, chat, and peer connections mounted. A corner call dock restores the same room and offers mic mute and an explicit end button. The hero's **Return to Meeting** button also restores it. Only one meeting is active at a time.
+6. **Leave meeting**, **End minimized meeting**, closing/reloading the tab, or losing signaling releases your microphone/screen and peer connections. Home/minimize is not a hang-up action; native browser Back or navigating to another website is not supported as persistent background calling.
 
 Groups support **up to six members including the creator**, using a full mesh of browser WebRTC connections. Larger groups need an SFU media server, which this app does not implement. Each member uploads to every other member, so bandwidth and CPU use increase with group size, especially for simultaneous screens. Use headphones to reduce feedback.
 
@@ -95,6 +96,8 @@ Keep the private certificate file private. It is renewed when the detected LAN a
 - Two-way microphone voice in Single meetings; multi-way voice in groups.
 - Screen video requests 720p at 15fps, up to 30fps; actual quality adapts to browser, network and CPU. The meeting UI sends microphone voice, not system/tab audio.
 - Multiple simultaneous screens, screen fullscreen, microphone and speaker mute.
+- Shared-screen stages are capped at 1540px wide and 725px high, shrink to the available viewport, and contain the video without stretching. The explicit fullscreen control can still expand a screen to the browser's fullscreen view.
+- Home minimizes an active Single or Group meeting into a responsive corner dock with live screen preview when available, restore, mic mute, and explicit leave controls.
 - Right-side chat/participants panel with a mobile drawer.
 - Responsive layouts, accessible input labels, keyboard focus, reduced-motion support, and connection/error states.
 

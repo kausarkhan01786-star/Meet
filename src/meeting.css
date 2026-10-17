@@ -706,6 +706,9 @@ button:active:not(:disabled) {
   display: flex;
   flex-direction: column;
 }
+.meeting-workspace[hidden] {
+  display: none;
+}
 .meeting-header {
   height: 73px;
   display: flex;
@@ -2341,6 +2344,156 @@ button:active:not(:disabled) {
   }
   .is-in-call .sidebar-scrim {
     top: 124px;
+  }
+}
+.is-in-call .meeting-stage.is-screen-stage {
+  flex: 1 1 0;
+  width: 100%;
+  max-width: 1540px;
+  max-height: 725px;
+  align-self: center;
+  overflow: hidden;
+}
+.meeting-screens {
+  max-width: 1540px;
+  max-height: 725px;
+  align-content: stretch;
+  grid-auto-rows: minmax(0, 1fr);
+}
+.meeting-screens .group-screen {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.meeting-screens .group-screen-heading {
+  flex-shrink: 0;
+}
+.meeting-screens .group-screen-media {
+  aspect-ratio: auto;
+  flex: 1;
+  min-height: 0;
+}
+.meeting-screens .group-screen:fullscreen {
+  max-height: none;
+}
+.minimized-call {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  width: 330px;
+  max-width: calc(100% - 32px);
+  min-height: 104px;
+  background: #211a2a;
+  border: 1px solid #766084;
+  border-radius: 8px;
+  box-shadow: 0 16px 55px #0009;
+}
+.minimized-call-restore {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  align-self: stretch;
+  flex: 1;
+  min-width: 0;
+  padding: 17px 11px 17px 17px;
+  background: transparent;
+  text-align: left;
+  border-radius: 7px 0 0 7px;
+}
+.minimized-call-restore:hover {
+  background: #b98cda0c;
+}
+.minimized-call-avatar {
+  display: grid;
+  place-items: center;
+  position: relative;
+  width: 58px;
+  height: 58px;
+  background: #3b294c;
+  border: 1px solid #76568a;
+  border-radius: 6px;
+  color: #d1b2e5;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+.minimized-call-avatar video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #0c0a10;
+}
+.minimized-call-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+}
+.minimized-call-copy strong {
+  font-family: var(--heading);
+  font-size: 13px;
+  font-weight: 550;
+  color: #e2d1ed;
+  line-height: 1.6;
+}
+.minimized-call-copy small {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 9px;
+  color: #a995b7;
+  line-height: 1.6;
+}
+.minimized-call-copy small > span:not(.tiny-dot) {
+  color: #655270;
+}
+.minimized-call-copy > span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 9px;
+  color: #c6a2df;
+}
+.minimized-call-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 10px;
+  border-left: 1px solid #6e4c831f;
+}
+.minimized-call-controls .m-icon {
+  width: 29px;
+  height: 29px;
+}
+.minimized-call-controls .minimized-call-end {
+  background: #75404c;
+  color: #f4c4ce;
+}
+.minimized-call-controls .minimized-call-end:hover {
+  background: #a35c6b;
+}
+@media (max-width: 600px) {
+  .has-minimized-call .hero-copy {
+    bottom: 160px;
+  }
+  .minimized-call {
+    right: 16px;
+    bottom: max(16px, env(safe-area-inset-bottom));
+    width: 305px;
+  }
+  .minimized-call-restore {
+    padding: 14px;
+    gap: 10px;
+  }
+  .minimized-call-avatar {
+    width: 49px;
+    height: 49px;
+  }
+  .minimized-call-copy strong {
+    font-size: 12px;
   }
 }
 @keyframes sidebar-enter {

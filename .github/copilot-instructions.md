@@ -21,6 +21,7 @@
 - Group mode supports up to six members with multi-way microphone voice and simultaneous desktop screen videos through a WebRTC mesh. Keep group signaling isolated from one-to-one rooms; remove empty groups and clean up media on leave.
 - Keep TURN secrets server-side and out of git; public deployments need access control and relay bandwidth quotas.
 - Meeting UI: hero-only Three.js Earth home, Add Meeting reveals Single/Group cards, fullscreen voice-first rooms, and right-side chat with mobile drawer. Chat is scoped to the room, length/rate-limited, not persisted and not end-to-end encrypted from the signaling server.
+- Keep active rooms mounted when Home minimizes them; restoring must reuse the same peers and media. Only explicit Leave/End, tab close/reload, or signaling loss ends capture. Shared-screen stages are capped at 1540x725px with responsive containment; native fullscreen remains available.
 
 # Verification
 
