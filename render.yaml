@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: relay-screen
+    runtime: docker
+    plan: starter
+    numInstances: 1
+    healthCheckPath: /healthz
+    envVars:
+      - key: LOCAL_HTTPS
+        value: "false"
+      - key: TRUST_PROXY
+        value: "true"
+      - key: TURN_URLS
+        sync: false
+      - key: TURN_SECRET
+        sync: false
