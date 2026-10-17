@@ -83,6 +83,12 @@ export default function MeetingApp() {
               <span className="button-shimmer" aria-hidden="true" />
             </button>
           </section>
+          <footer className="creator-credit">
+            <span>&copy; {new Date().getFullYear()} Meeting.</span>
+            <span>
+              Created by <strong>Kausar mia</strong>
+            </span>
+          </footer>
           <dialog
             className="meeting-picker"
             ref={dialogRef}

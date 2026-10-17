@@ -24,10 +24,12 @@ import {
   Users,
   Volume2,
   VolumeX,
+  Video,
+  VideoOff,
   X,
 } from "lucide-react";
 import { useGroup } from "./useGroup";
-import { MemberAudio, SharedScreen } from "./MediaViews";
+import { CameraTile, MemberAudio, SharedScreen } from "./MediaViews";
 
 function ChatPanel({ group, tab, setTab, onClose }) {
   const [draft, setDraft] = useState("");
@@ -224,9 +226,12 @@ export default function MeetingRoom({
   const joinedAt = useRef(0);
   const minimizedVideoRef = useRef(null);
   const previewMember = group.members.find((member) => member.sharing);
+  const cameraPreviewMember = group.members.find((member) => member.camera);
   const previewStream =
     group.localScreen ||
-    (previewMember ? group.streams[previewMember.id] : null);
+    (previewMember ? group.streams[previewMember.id] : null) ||
+    group.localCamera ||
+    (cameraPreviewMember ? group.cameraStreams[cameraPreviewMember.id] : null);
   useEffect(() => {
     const video = minimizedVideoRef.current;
     if (!minimized || !previewStream || !video) return;
@@ -296,6 +301,29 @@ export default function MeetingRoom({
   }
   const screenMembers = group.members.filter((member) => member.sharing);
   const screenCount = screenMembers.length + Number(group.sharing);
+  const cameraCount =
+    group.members.filter((member) => member.camera).length +
+    Number(group.cameraOn);
+  const cameraTiles = (
+    <>
+      <CameraTile
+        stream={group.localCamera}
+        name={name.trim() || (mode === "create" ? "Host" : "Guest")}
+        local
+        enabled={group.cameraOn}
+        muted={group.muted}
+      />
+      {group.members.map((member) => (
+        <CameraTile
+          key={member.id}
+          stream={group.cameraStreams[member.id]}
+          name={member.name}
+          enabled={member.camera}
+          muted={member.muted}
+        />
+      ))}
+    </>
+  );
   const connectedCount = Object.values(group.connections).filter(
     (value) => value === "connected",
   ).length;
@@ -592,6 +620,8 @@ export default function MeetingRoom({
                       />
                     ))}
                   </div>
+                ) : cameraCount ? (
+                  <div className="camera-grid">{cameraTiles}</div>
                 ) : (
                   <div className="voice-room">
                     <div className="voice-room-top">
@@ -687,6 +717,11 @@ export default function MeetingRoom({
                 )}
               </section>
             )}
+            {group.room && screenCount > 0 && cameraCount > 0 && (
+              <div className="camera-strip" aria-label="Meeting cameras">
+                {cameraTiles}
+              </div>
+            )}
             {group.error && (
               <div className="meeting-error" role="alert">
                 <span>{group.error}</span>
@@ -717,6 +752,21 @@ export default function MeetingRoom({
                 )}
               </div>
               <div className="call-controls">
+                <button
+                  className={`call-control camera-control ${group.cameraOn ? "camera-is-on" : "control-off"}`}
+                  aria-label={
+                    group.cameraOn ? "Turn camera off" : "Turn camera on"
+                  }
+                  title={group.cameraOn ? "Turn camera off" : "Turn camera on"}
+                  disabled={!group.room || group.mediaBusy}
+                  onClick={group.toggleCamera}
+                >
+                  {group.cameraOn ? (
+                    <Video size={20} />
+                  ) : (
+                    <VideoOff size={20} />
+                  )}
+                </button>
                 <button
                   className={`call-control ${group.muted ? "control-off" : ""}`}
                   aria-label={

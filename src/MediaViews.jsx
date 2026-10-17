@@ -1,5 +1,77 @@
 import { useEffect, useRef, useState } from "react";
-import { Expand, LoaderCircle, Volume2 } from "lucide-react";
+import { Expand, LoaderCircle, MicOff, VideoOff, Volume2 } from "lucide-react";
+
+export function CameraTile({
+  stream,
+  name,
+  local = false,
+  enabled = false,
+  muted = false,
+}) {
+  const videoRef = useRef(null);
+  const [blocked, setBlocked] = useState(false);
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    const video = videoRef.current;
+    setReady(false);
+    if (!enabled || !stream || !video) return;
+    video.srcObject = new MediaStream(stream.getVideoTracks());
+    video
+      .play()
+      .then(() => setBlocked(false))
+      .catch(() => setBlocked(true));
+    return () => {
+      video.srcObject = null;
+    };
+  }, [stream, enabled]);
+  return (
+    <section
+      className={`camera-tile ${local ? "is-local" : ""}`}
+      aria-label={local ? "Your camera" : `${name}'s camera`}
+    >
+      {enabled ? (
+        <>
+          <video
+            ref={videoRef}
+            autoPlay
+            muted
+            playsInline
+            onLoadedData={() => setReady(true)}
+          />
+          {!ready && !blocked && (
+            <span className="camera-loading">
+              <LoaderCircle className="spin" size={22} />
+            </span>
+          )}
+          {blocked && (
+            <button
+              className="video-play"
+              onClick={() =>
+                videoRef.current
+                  .play()
+                  .then(() => setBlocked(false))
+                  .catch(() => setBlocked(true))
+              }
+            >
+              Play video
+            </button>
+          )}
+        </>
+      ) : (
+        <div className="camera-placeholder">
+          <span>{name.slice(0, 2).toUpperCase()}</span>
+          <small>
+            <VideoOff size={13} /> Camera off
+          </small>
+        </div>
+      )}
+      <div className="camera-caption">
+        <span>{local ? "You" : name}</span>
+        {muted && <MicOff size={14} />}
+      </div>
+    </section>
+  );
+}
 
 export function MemberAudio({ stream, muted, name }) {
   const audioRef = useRef(null);

@@ -160,7 +160,13 @@ test("groups admit multiple members, relay targeted messages and survive creator
   send(second, { type: "group-join", code: created.code, name: "Second" });
   const joined = await receive(second);
   assert.deepEqual(joined.members, [
-    { id: created.selfId, name: "Creator", muted: true, sharing: false, camera: false },
+    {
+      id: created.selfId,
+      name: "Creator",
+      muted: true,
+      sharing: false,
+      camera: false,
+    },
   ]);
   await creatorNotice;
   const creatorThird = receive(creator);
@@ -172,7 +178,12 @@ test("groups admit multiple members, relay targeted messages and survive creator
   await secondThird;
   const creatorMedia = receive(creator);
   const thirdMedia = receive(third);
-  send(second, { type: "group-media", muted: false, sharing: true, camera: true });
+  send(second, {
+    type: "group-media",
+    muted: false,
+    sharing: true,
+    camera: true,
+  });
   assert.deepEqual(await thirdMedia, {
     type: "group-member-media",
     id: joined.selfId,
@@ -243,14 +254,24 @@ test("late joiners receive camera status without replacing screen-sharing status
   const guest = await client();
   send(host, { type: "group-create", name: "Host" });
   const { code } = await receive(host);
-  send(host, { type: "group-media", muted: false, sharing: true, camera: true });
+  send(host, {
+    type: "group-media",
+    muted: false,
+    sharing: true,
+    camera: true,
+  });
   const noticed = receive(host);
   send(guest, { type: "group-join", code });
   const room = await receive(guest);
   assert.equal(room.members[0].camera, true);
   assert.equal(room.members[0].sharing, true);
   await noticed;
-  send(host, { type: "group-media", muted: false, sharing: true, camera: false });
+  send(host, {
+    type: "group-media",
+    muted: false,
+    sharing: true,
+    camera: false,
+  });
   const update = await receive(guest);
   assert.equal(update.camera, false);
   assert.equal(update.sharing, true);

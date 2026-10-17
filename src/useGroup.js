@@ -1,5 +1,14 @@
 import { useEffect, useRef, useState } from "react";
-import { loadRtcConfiguration } from "./useCast";
+import { loadRtcConfiguration } from "./useCast.js";
+
+export function mediaSlot(transceiver, transceivers) {
+  if (transceiver.receiver.track.kind === "audio") return "audio";
+  return transceivers
+    .filter((item) => item.receiver.track.kind === "video")
+    .indexOf(transceiver) === 0
+    ? "screen"
+    : "camera";
+}
 
 export function useGroup({ meetingType = "group" } = {}) {
   const [online, setOnline] = useState(false);
@@ -7,6 +16,9 @@ export function useGroup({ meetingType = "group" } = {}) {
   const [room, setRoom] = useState(null);
   const [members, setMembers] = useState([]);
   const [streams, setStreams] = useState({});
+  const [cameraStreams, setCameraStreams] = useState({});
+  const [localCamera, setLocalCamera] = useState(null);
+  const [cameraOn, setCameraOn] = useState(false);
   const [connections, setConnections] = useState({});
   const [muted, setMuted] = useState(true);
   const [sharing, setSharing] = useState(false);
@@ -20,6 +32,7 @@ export function useGroup({ meetingType = "group" } = {}) {
   const pendingIceRef = useRef(new Map());
   const micRef = useRef(null);
   const screenRef = useRef(null);
+  const cameraRef = useRef(null);
   const roomRef = useRef(null);
   const configRef = useRef(null);
   const generation = useRef(0);
@@ -37,6 +50,7 @@ export function useGroup({ meetingType = "group" } = {}) {
         ?.getAudioTracks()
         .some((track) => track.enabled && track.readyState === "live"),
       sharing: Boolean(screenRef.current),
+      camera: Boolean(cameraRef.current),
     });
   const closePeer = (id) => {
     const entry = peersRef.current.get(id);
@@ -51,13 +65,14 @@ export function useGroup({ meetingType = "group" } = {}) {
     generation.current += 1;
     for (const id of peersRef.current.keys()) closePeer(id);
     pendingIceRef.current.clear();
-    for (const source of [micRef.current, screenRef.current])
+    for (const source of [micRef.current, screenRef.current, cameraRef.current])
       source?.getTracks().forEach((track) => {
         track.onended = null;
         track.stop();
       });
     micRef.current = null;
     screenRef.current = null;
+    cameraRef.current = null;
     roomRef.current = null;
     busyRef.current = false;
     enteringRef.current = false;
@@ -66,6 +81,9 @@ export function useGroup({ meetingType = "group" } = {}) {
     setRoom(null);
     setMembers([]);
     setStreams({});
+    setCameraStreams({});
+    setLocalCamera(null);
+    setCameraOn(false);
     setConnections({});
     setLocalScreen(null);
     setSharing(false);
@@ -76,11 +94,13 @@ export function useGroup({ meetingType = "group" } = {}) {
   };
   const sendTracks = async (entry) => {
     for (const transceiver of entry.peer.getTransceivers()) {
-      const kind = transceiver.receiver.track.kind;
+      const slot = mediaSlot(transceiver, entry.peer.getTransceivers());
       const track =
-        kind === "audio"
+        slot === "audio"
           ? micRef.current?.getAudioTracks()[0]
-          : screenRef.current?.getVideoTracks()[0];
+          : slot === "screen"
+            ? screenRef.current?.getVideoTracks()[0]
+            : cameraRef.current?.getVideoTracks()[0];
       transceiver.direction = "sendrecv";
       await transceiver.sender.replaceTrack(track || null);
     }
@@ -92,10 +112,12 @@ export function useGroup({ meetingType = "group" } = {}) {
       iceTransportPolicy: configRef.current.iceTransportPolicy,
     });
     const remote = new MediaStream();
-    const entry = { peer, remote };
+    const camera = new MediaStream();
+    const entry = { peer, remote, camera };
     peersRef.current.set(id, entry);
     if (initiator) {
       peer.addTransceiver("audio", { direction: "sendrecv" });
+      peer.addTransceiver("video", { direction: "sendrecv" });
       peer.addTransceiver("video", { direction: "sendrecv" });
     }
     peer.onicecandidate = ({ candidate }) => {
@@ -107,7 +129,16 @@ export function useGroup({ meetingType = "group" } = {}) {
           payload: candidate.toJSON(),
         });
     };
-    peer.ontrack = ({ track }) => {
+    peer.ontrack = ({ track, transceiver }) => {
+      if (mediaSlot(transceiver, peer.getTransceivers()) === "camera") {
+        if (!camera.getTracks().some((existing) => existing.id === track.id))
+          camera.addTrack(track);
+        setCameraStreams((current) => ({
+          ...current,
+          [id]: new MediaStream(camera.getTracks()),
+        }));
+        return;
+      }
       if (!remote.getTracks().some((existing) => existing.id === track.id))
         remote.addTrack(track);
       setStreams((current) => ({
@@ -197,6 +228,7 @@ export function useGroup({ meetingType = "group" } = {}) {
                       ...member,
                       muted: message.muted,
                       sharing: message.sharing,
+                      camera: message.camera === true,
                     }
                   : member,
               ),
@@ -207,6 +239,11 @@ export function useGroup({ meetingType = "group" } = {}) {
               current.filter((member) => member.id !== message.id),
             );
             setStreams((current) => {
+              const next = { ...current };
+              delete next[message.id];
+              return next;
+            });
+            setCameraStreams((current) => {
               const next = { ...current };
               delete next[message.id];
               return next;
@@ -322,12 +359,15 @@ export function useGroup({ meetingType = "group" } = {}) {
       if (currentGeneration === generation.current) busyRef.current = false;
     }
   }
-  async function replaceKind(kind, track) {
+  async function replaceKind(slot, track) {
     const results = await Promise.allSettled(
       [...peersRef.current.values()].flatMap(({ peer }) =>
         peer
           .getTransceivers()
-          .filter((transceiver) => transceiver.receiver.track.kind === kind)
+          .filter(
+            (transceiver) =>
+              mediaSlot(transceiver, peer.getTransceivers()) === slot,
+          )
           .map((transceiver) => transceiver.sender.replaceTrack(track)),
       ),
     );
@@ -384,7 +424,7 @@ export function useGroup({ meetingType = "group" } = {}) {
     });
     setSharing(false);
     setLocalScreen(null);
-    await replaceKind("video", null);
+    await replaceKind("screen", null);
     publishMedia();
   }
   async function shareScreen() {
@@ -412,7 +452,7 @@ export function useGroup({ meetingType = "group" } = {}) {
       };
       setLocalScreen(source);
       setSharing(true);
-      await replaceKind("video", source.getVideoTracks()[0]);
+      await replaceKind("screen", source.getVideoTracks()[0]);
       setError("");
       publishMedia();
     } catch (failure) {
@@ -435,6 +475,69 @@ export function useGroup({ meetingType = "group" } = {}) {
     clearView();
     setError("");
   }
+  async function stopCamera() {
+    const source = cameraRef.current;
+    cameraRef.current = null;
+    source?.getTracks().forEach((track) => {
+      track.onended = null;
+      track.stop();
+    });
+    setLocalCamera(null);
+    setCameraOn(false);
+    await replaceKind("camera", null);
+    publishMedia();
+  }
+  async function toggleCamera() {
+    if (!roomRef.current || busyRef.current) return;
+    if (cameraRef.current) return stopCamera();
+    const currentGeneration = generation.current;
+    busyRef.current = true;
+    setMediaBusy(true);
+    let source;
+    try {
+      source = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: {
+          width: { ideal: 640 },
+          height: { ideal: 360 },
+          frameRate: { ideal: 24, max: 30 },
+          facingMode: "user",
+        },
+      });
+      if (currentGeneration !== generation.current) {
+        source.getTracks().forEach((track) => track.stop());
+        return;
+      }
+      const track = source.getVideoTracks()[0];
+      if (!track) throw new Error("No camera video track.");
+      cameraRef.current = source;
+      track.onended = () => {
+        void stopCamera();
+      };
+      setLocalCamera(source);
+      setCameraOn(true);
+      await replaceKind("camera", track);
+      setError("");
+      publishMedia();
+    } catch (failure) {
+      source?.getTracks().forEach((track) => track.stop());
+      if (currentGeneration === generation.current)
+        setError(
+          failure.name === "NotAllowedError"
+            ? "Camera permission was denied. Allow camera access in your browser and try again; your voice call is still connected."
+            : failure.name === "NotFoundError"
+              ? "No camera was found. Connect a webcam or use a device with a camera."
+              : failure.name === "NotReadableError"
+                ? "The camera is busy or unavailable. Close other camera apps and try again."
+                : "Camera could not start. Check camera permissions and try again.",
+        );
+    } finally {
+      if (currentGeneration === generation.current) {
+        busyRef.current = false;
+        setMediaBusy(false);
+      }
+    }
+  }
   function sendMessage(text) {
     if (!roomRef.current || !text.trim() || text.length > 2000) return false;
     return send({ type: "group-chat", text: text.trim() });
@@ -445,6 +548,10 @@ export function useGroup({ meetingType = "group" } = {}) {
     room,
     members,
     streams,
+    cameraStreams,
+    localCamera,
+    cameraOn,
+    toggleCamera,
     connections,
     muted,
     sharing,

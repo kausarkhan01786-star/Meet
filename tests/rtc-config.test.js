@@ -3,19 +3,46 @@ import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
 import { getRtcConfig } from "../server/rtc-config.js";
 import { loadRtcConfiguration } from "../src/useCast.js";
+import { mediaSlot } from "../src/useGroup.js";
+
+test("microphone, screen and camera transceivers keep separate media slots", () => {
+  const transceivers = ["audio", "video", "video"].map((kind) => ({
+    receiver: { track: { kind } },
+  }));
+  assert.deepEqual(
+    transceivers.map((item) => mediaSlot(item, transceivers)),
+    ["audio", "screen", "camera"],
+  );
+});
 
 test("client identifies an outdated server returning HTML instead of RTC settings", async () => {
   await assert.rejects(
-    loadRtcConfiguration(async () => new Response("<!doctype html><html></html>", { headers: { "content-type": "text/html" } })),
+    loadRtcConfiguration(
+      async () =>
+        new Response("<!doctype html><html></html>", {
+          headers: { "content-type": "text/html" },
+        }),
+    ),
     /current phone link/,
   );
 });
 
 test("client accepts current settings and reports unavailable or malformed settings", async () => {
   const config = getRtcConfig({});
-  assert.deepEqual(await loadRtcConfiguration(async () => Response.json(config)), config);
-  await assert.rejects(loadRtcConfiguration(async () => new Response("Unavailable", { status: 503 })), /HTTP 503/);
-  await assert.rejects(loadRtcConfiguration(async () => Response.json({})), /Invalid connection settings/);
+  assert.deepEqual(
+    await loadRtcConfiguration(async () => Response.json(config)),
+    config,
+  );
+  await assert.rejects(
+    loadRtcConfiguration(
+      async () => new Response("Unavailable", { status: 503 }),
+    ),
+    /HTTP 503/,
+  );
+  await assert.rejects(
+    loadRtcConfiguration(async () => Response.json({})),
+    /Invalid connection settings/,
+  );
 });
 
 test("uses STUN without falsely claiming relay coverage", () => {

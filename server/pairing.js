@@ -217,7 +217,8 @@ export function createPairingService({
             !group ||
             typeof message.muted !== "boolean" ||
             typeof message.sharing !== "boolean" ||
-            (message.camera !== undefined && typeof message.camera !== "boolean")
+            (message.camera !== undefined &&
+              typeof message.camera !== "boolean")
           )
             return;
           socket.groupMuted = message.muted;
