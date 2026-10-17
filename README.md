@@ -1,6 +1,6 @@
-# Relay
+# Meeting
 
-A dark-purple browser screen-sharing app with six-digit pairing, PC microphone voice, and optional system audio. Receivers can use a phone or another computer. Different networks are supported when the app is publicly hosted over HTTPS and a working TURN relay is configured. This checkout is not automatically a publicly reachable website.
+A browser meeting app with an interactive Three.js Earth hero, animated meeting choices, two-way voice, simultaneous screen sharing, and in-room chat. Single meetings support two people; groups support six. Different networks require public HTTPS hosting and a working TURN relay. This checkout is not automatically a publicly reachable website.
 
 ## Run
 
@@ -14,25 +14,29 @@ npm run dev
 On Windows PowerShell, use `npm.cmd` instead of `npm` if script execution policy blocks npm. The **Relay: development server** VS Code task also starts the app.
 
 - PC: <http://localhost:5173>
-- Phone: use the `https://YOUR-PC-LAN-IP:5443` address printed in the terminal, shown on the PC pairing page, or listed under Connection details.
+- Phone: use the `https://YOUR-PC-LAN-IP:5443` address printed in the development-server terminal.
 - These default addresses are only for local preview on the same LAN. They are not reachable from someone else's Wi-Fi or mobile data.
 - For internet access, follow **Public Deployment** below. Both devices must open the same public website; they do not need the same Wi-Fi.
 
 ## Group Voice And Screens
 
-The home page has a **Group** option alongside the existing PC/phone modes.
+The hero contains **Add Meeting**, which reveals **Single meeting** and **Group meeting** cards. Mouse/touch drag rotates the globe. Motion respects the reduced-motion preference; WebGL-unavailable browsers see a bitmap fallback.
 
-1. Open **Group**, choose **Create group**, enter your name, and allow microphone access. The room displays a six-digit group code.
-2. Give the same website address and group code only to the intended people. They select **Group > Add group / Join group**, enter their name and the code, and allow their microphones.
+1. Open **Add Meeting > Group meeting**, optionally enter your name, select **Create group**, and allow microphone access. The fullscreen room displays its six-digit group code.
+2. Give the website address and code only to the intended people. They select **Add Meeting > Group meeting > Add group**. Entering all six digits starts joining automatically; **Connect** can retry a rejected code.
 3. Everyone can talk and listen at the same time. Use the microphone button to mute/unmute yourself and the speaker button to mute/unmute playback on your device. If autoplay is blocked, press the member's **Hear** button.
 4. Any member using a supported desktop Chrome/Edge browser can press **Share screen**. Multiple members can share simultaneously; their screen tiles appear separately with fullscreen controls. Screen sharing here sends video only; voices are carried by each member's microphone. Phones can join voice and view screens, but mobile browser screen capture is generally unavailable.
-5. **Stop sharing** ends only your screen, not the group voice. **Leave group**, returning home, closing the tab, or losing the signaling connection releases your microphone/screen and peer connections.
+5. **Stop sharing** ends only your screen, not the voice call. **Leave meeting**, returning home, closing the tab, or losing signaling releases your microphone/screen and peer connections.
 
 Groups support **up to six members including the creator**, using a full mesh of browser WebRTC connections. Larger groups need an SFU media server, which this app does not implement. Each member uploads to every other member, so bandwidth and CPU use increase with group size, especially for simultaneous screens. Use headphones to reduce feedback.
 
 A group code remains valid while at least one member stays connected. The creator leaving does not end the room for others; the last member leaving deletes it. Names are display labels, not verified identities. No moderator, member-kicking, recording, or account authentication is provided. If microphone permission is denied, you can still join and view; press **Unmute** after allowing permission to speak.
 
-Groups use the same HTTPS/STUN/TURN setup as PC/phone mode. **Local private-IP links still only work on the local network.** Different-network group calls require a public HTTPS deployment and working TURN. Group browser verification used three generated microphone sources, confirmed the full mesh and inbound audio packets at each member, decoded two concurrent screen streams, exercised mute status, late join and creator departure, and checked track cleanup. Real physical microphones, mobile hardware, and public/TURN connectivity still require real-device testing.
+Groups and Single meetings share the same HTTPS/STUN/TURN infrastructure. **Local private-IP links only work on the local network.** Browser verification used generated microphones and screens; real physical microphones, mobile capture permissions and public/TURN connectivity still require real-device testing.
+
+## Meeting Chat
+
+The right-side panel has Chat and People tabs. On small screens, the chat button opens an overlay drawer. Messages are limited to 2,000 characters, sent only to members of the same room, and rendered as plain text. The server assigns sender identity and limits message bursts. Chat travels over the signaling connection (TLS on HTTPS deployments); unlike WebRTC media, it is not end-to-end encrypted from the signaling server. No server-side history is stored. Each browser keeps at most 200 messages until leaving, so late joiners do not receive earlier messages. Display names are not verified identities.
 
 ## Public Deployment
 
@@ -66,16 +70,14 @@ Treat the code as temporary screen access: give it only to the intended person a
 
 The ICE configuration endpoint provides client-usable TURN credentials. Anyone able to access it can consume relay bandwidth; put it and the rest of the app behind your access control and enforce TURN quotas. Shared secrets remain server-side, but short-lived credentials can still be used until they expire. Static provider credentials are visible to authorized browser clients by design. Configure provider usage limits and rotate credentials when needed.
 
-## Connect
+## Single Meetings
 
-1. Open the website in desktop Chrome or Edge and select **This device is my PC**.
-2. Open the **same** website on the receiving device and select **This device is my phone**. Another computer can also use this receiver mode.
-3. Enter the PC's six-digit code on the phone and press **Connect to PC**.
-4. On the PC, enable **Share microphone** for your voice and optionally **Share system audio**. Press **Choose a screen**, approve a screen/window/tab, and allow the microphone. You can start sharing before pairing. If microphone permission is denied, capture stops and the app asks you to retry or disable microphone sharing.
-5. Use fullscreen on the phone for a larger view. Audio starts muted: tap **Unmute audio** to hear the PC's voice and optional system audio. The PC's **Mute microphone** button mutes voice without muting system audio. This is one-way voice from PC to receiver, not a two-way call. Keep the receiver browser open and the phone awake.
-6. **Stop sharing**, the browser's native stop action, or returning home ends capture. Disconnecting only the phone leaves the PC capture running so another phone can reconnect before the code expires.
+1. Select **Add Meeting > Single meeting > Create call**. An optional display name can be entered before creating. Allow microphone access; the room shows **Make room for another screen.** and a six-digit pairing code.
+2. The other participant opens the same website and chooses **Single meeting > Receive call**. Filling all six digits starts connecting automatically; no screen capture is required to talk.
+3. Both participants can speak and listen, mute microphones/speakers, use chat, and later share a screen from a supported desktop browser. A Single meeting admits at most two people. Its code cannot be used in Group mode.
+4. Stopping screen sharing preserves the voice call. The red leave button releases all capture. The remaining person can wait for a replacement participant; the room is deleted when empty.
 
-Only one phone can pair with a PC session at a time. Unused codes expire after 10 minutes. An already connected stream can continue after that; generate a new code before pairing a replacement phone. Sessions are in memory and disappear when the server restarts.
+Meeting codes last while a participant remains connected. All sessions and chat are in memory and disappear on server restart. The old one-way casting protocol remains supported server-side for compatibility, but the new Single meeting UI uses two-way voice rooms.
 
 ## Local HTTPS
 
@@ -89,11 +91,11 @@ Keep the private certificate file private. It is renewed when the detected LAN a
 
 ## Controls
 
-- Six-digit code with copy, expiry countdown, and regeneration.
-- 1080p, 720p, or 480p requested capture height at up to 30fps. Actual resolution adapts to browser, screen, bandwidth, and CPU.
-- Optional system/tab audio, depending on browser and selected capture source.
-- Optional PC microphone voice, with microphone and system audio mixed into one outgoing track and live microphone mute/unmute.
-- Local PC preview, phone fullscreen, playback pause/resume, and mute/unmute.
+- Six-digit meeting code with copy and automatic receiving.
+- Two-way microphone voice in Single meetings; multi-way voice in groups.
+- Screen video requests 720p at 15fps, up to 30fps; actual quality adapts to browser, network and CPU. The meeting UI sends microphone voice, not system/tab audio.
+- Multiple simultaneous screens, screen fullscreen, microphone and speaker mute.
+- Right-side chat/participants panel with a mobile drawer.
 - Responsive layouts, accessible input labels, keyboard focus, reduced-motion support, and connection/error states.
 
 ## Troubleshooting
@@ -102,8 +104,8 @@ Keep the private certificate file private. It is renewed when the detected LAN a
 - **Local preview unreachable:** use the PC's LAN address, allow Node.js on the Windows Private network only, and check the local ports. Never disable the firewall.
 - **Paired but no video/audio:** verify TURN URLs, credentials, open relay ports and firewall rules; test `ICE_RELAY_ONLY=true`. The UI's relay-configured indicator only confirms settings exist, not relay reachability or credentials validity. Check VPNs and browser permissions. Local previews can still connect without TURN.
 - **Capture unavailable:** use desktop Chrome/Edge on localhost or a trusted HTTPS origin. Phones are receivers, not PC-screen capture sources.
-- **Voice unavailable:** allow microphone permission on the PC, enable Share microphone before capture, and unmute audio on the receiver. Check the PC's live mic mute button and the system microphone input. For system audio, choose a supported browser source and enable its audio checkbox in the native picker.
-- **Code rejected:** check all six digits, expiration, and whether another phone is connected.
+- **Voice unavailable:** allow microphone access on each device, check its input device and mic/speaker mute controls, and press a member's Hear button if browser autoplay is blocked.
+- **Code rejected:** check all six digits, matching Single/Group mode, room capacity, and whether anyone remains in the room.
 - **Port busy:** set `PORT` and/or `HTTPS_PORT` before starting. For example in PowerShell, run `$env:PORT=5174` and `$env:HTTPS_PORT=5444`, then `npm.cmd run dev`.
 
 ## Production And Tests

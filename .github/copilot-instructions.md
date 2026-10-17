@@ -17,9 +17,10 @@
 - Keep pairing codes ephemeral and clean up peers on disconnect.
 - Run `npm test` and `npm run build` before completion.
 - Different-network sharing requires public HTTPS hosting and configured TURN. Never claim local private IPs are internet-accessible or that configuration proves relay connectivity.
-- PC/phone mode has one-way PC microphone audio, optionally mixed with system audio; do not label that mode a two-way call.
+- The current Meeting UI uses two-way microphone voice in Single rooms (two members) and Group rooms (six members). The legacy server-side PC/phone casting protocol remains one-way; do not confuse it with the new Single meeting UI.
 - Group mode supports up to six members with multi-way microphone voice and simultaneous desktop screen videos through a WebRTC mesh. Keep group signaling isolated from one-to-one rooms; remove empty groups and clean up media on leave.
 - Keep TURN secrets server-side and out of git; public deployments need access control and relay bandwidth quotas.
+- Meeting UI: hero-only Three.js Earth home, Add Meeting reveals Single/Group cards, fullscreen voice-first rooms, and right-side chat with mobile drawer. Chat is scoped to the room, length/rate-limited, not persisted and not end-to-end encrypted from the signaling server.
 
 # Verification
 
@@ -29,3 +30,4 @@
 - Internet/voice update: generated video and audio tracks were received over real WebRTC, mic mute/unmute and capture cleanup were checked. Real separate-network/TURN verification requires a public deployment and real relay credentials and remains unverified.
 - Group verification: three browser members connected in a full mesh with inbound audio packets; two simultaneous screen streams decoded. Late joining, mute propagation, creator departure and capture cleanup were checked with generated media. Physical devices and public/TURN group connectivity remain unverified.
 - Start the app with the `Relay: development server` task. Windows PowerShell may require `npm.cmd` instead of `npm`.
+- Meeting redesign verification: Single code auto-join connected two-way audio before any screen capture; receiver-initiated screen decoded; chat delivered; screen stop preserved voice and leave stopped capture. Three-member group auto-join and chat broadcast also passed with generated media. Globe canvas pixels and pointer-driven camera changes checked on desktop/mobile layouts. Physical devices and current public/TURN deployment were not re-tested.

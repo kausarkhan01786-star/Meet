@@ -571,7 +571,8 @@ button:active:not(:disabled) {
     letter-spacing: 1.5px;
   }
   .world-canvas {
-    inset: -31% -40% 2% -17%;
+    inset: -32px -16% auto -16%;
+    height: min(66svh, 550px);
     opacity: 0.88;
   }
   .world-vignette {
@@ -2234,6 +2235,112 @@ button:active:not(:disabled) {
   }
   .chat-composer {
     padding-bottom: max(18px, env(safe-area-inset-bottom));
+  }
+}
+.is-in-call .meeting-header {
+  gap: 20px;
+}
+.header-room-title {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--heading);
+  font-size: 20px;
+  font-weight: 550;
+  line-height: 1.4;
+  color: #efebf2;
+}
+.is-in-call .header-room-code {
+  width: auto;
+  margin: 0;
+  padding: 0 0 0 18px;
+  border-top: 0;
+}
+.is-in-call .header-end {
+  margin-left: 0;
+  flex-shrink: 0;
+}
+.is-in-call .workspace-brand,
+.is-in-call .meeting-type-label {
+  flex-shrink: 0;
+}
+.is-in-call .meeting-workspace-body {
+  height: calc(100dvh - 73px);
+  min-height: 0;
+}
+.is-in-call .meeting-main {
+  min-height: 0;
+  padding: 16px 20px 0;
+}
+.is-in-call .meeting-stage {
+  min-height: 0;
+  margin-bottom: 12px;
+  overflow: auto;
+}
+@media (max-width: 1200px) {
+  .is-in-call .meeting-header {
+    gap: 15px;
+  }
+  .header-room-title {
+    font-size: 18px;
+  }
+  .is-in-call .encryption-status {
+    display: none;
+  }
+}
+@media (max-width: 760px) {
+  .is-in-call .meeting-header {
+    height: 124px;
+    padding: 12px 18px;
+    flex-wrap: wrap;
+    align-content: space-between;
+    gap: 8px 10px;
+  }
+  .is-in-call .workspace-brand {
+    order: 0;
+    flex: 1;
+    min-width: 0;
+  }
+  .is-in-call .workspace-header-divider {
+    display: none;
+  }
+  .is-in-call .meeting-type-label {
+    order: 1;
+  }
+  .is-in-call .header-end {
+    order: 2;
+  }
+  .header-room-title {
+    order: 3;
+    flex: 1 1 calc(100% - 130px);
+    font-size: 15px;
+    line-height: 1.35;
+  }
+  .is-in-call .header-room-code {
+    order: 4;
+    flex: 0 0 auto;
+    display: block;
+    padding-left: 12px;
+  }
+  .is-in-call .header-room-code > span {
+    font-size: 7px;
+  }
+  .is-in-call .header-room-code > div {
+    gap: 7px;
+  }
+  .is-in-call .header-room-code strong {
+    font-size: 20px;
+  }
+  .is-in-call .meeting-workspace-body {
+    height: calc(100dvh - 124px);
+  }
+  .is-in-call .meeting-main {
+    padding: 12px 12px 0;
+  }
+  .is-in-call .meeting-sidebar {
+    top: 124px;
+  }
+  .is-in-call .sidebar-scrim {
+    top: 124px;
   }
 }
 @keyframes sidebar-enter {

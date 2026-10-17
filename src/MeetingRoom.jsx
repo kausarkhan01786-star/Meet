@@ -27,11 +27,14 @@ import {
   X,
 } from "lucide-react";
 import { useGroup } from "./useGroup";
-import { MemberAudio, SharedScreen } from "./GroupRoom";
+import { MemberAudio, SharedScreen } from "./MediaViews";
 
 function ChatPanel({ group, tab, setTab, onClose }) {
   const [draft, setDraft] = useState("");
   const bottomRef = useRef(null);
+  useEffect(() => {
+    setDraft("");
+  }, [group.room?.selfId]);
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }, [group.messages.length]);
@@ -284,7 +287,9 @@ export default function MeetingRoom({ meetingType = "group", onBack }) {
           : "Your people, all here."
         : "A conversation starts here.";
   return (
-    <div className={`meeting-workspace ${chatOpen ? "has-sidebar" : ""}`}>
+    <div
+      className={`meeting-workspace ${chatOpen ? "has-sidebar" : ""} ${group.room ? "is-in-call" : ""}`}
+    >
       <header className="meeting-header">
         <button
           className="workspace-brand"
@@ -308,6 +313,27 @@ export default function MeetingRoom({ meetingType = "group", onBack }) {
           {single ? "Single meeting" : "Group meeting"}
           <ChevronDown size={13} />
         </button>
+        {group.room && (
+          <>
+            <h1 className="header-room-title">{title}</h1>
+            <div className="room-code-box header-room-code">
+              <span>{single ? "PAIRING CODE" : "GROUP CODE"}</span>
+              <div>
+                <strong aria-label={`Meeting code ${group.room.code}`}>
+                  {group.room.code}
+                </strong>
+                <button
+                  className="m-icon"
+                  aria-label="Copy meeting code"
+                  title={copied ? "Copied" : "Copy code"}
+                  onClick={copyCode}
+                >
+                  {copied ? <Check size={16} /> : <Copy size={16} />}
+                </button>
+              </div>
+            </div>
+          </>
+        )}
         <div className="header-end">
           <span className="encryption-status">
             <ShieldCheck size={14} /> Encrypted media
@@ -327,63 +353,52 @@ export default function MeetingRoom({ meetingType = "group", onBack }) {
       </header>
       <div className="meeting-workspace-body">
         <main className="meeting-main">
-          <div className="room-topline">
-            <button className="workspace-back" onClick={mode ? leave : home}>
-              <ArrowLeft size={14} />
-              {mode ? "Meeting options" : "Back to the world"}
-            </button>
-            <span className="room-state">
-              <span
-                className={`tiny-dot ${connectedCount ? "" : "is-waiting"}`}
-              />
-              {connectedCount
-                ? `${connectedCount + 1} connected`
-                : group.room
-                  ? "Waiting for company"
-                  : group.joining
-                    ? "Connecting"
-                    : group.online
-                      ? "Ready to connect"
-                      : "Connecting to server"}
-            </span>
-          </div>
-          <section className="room-heading">
-            <div>
-              <div className="room-eyebrow">
-                {single ? "A LITTLE LESS DISTANCE" : "YOUR SHARED SPACE"}
+          {!group.room && (
+            <>
+              <div className="room-topline">
+                <button
+                  className="workspace-back"
+                  onClick={mode ? leave : home}
+                >
+                  <ArrowLeft size={14} />
+                  {mode ? "Meeting options" : "Back to the world"}
+                </button>
+                <span className="room-state">
+                  <span
+                    className={`tiny-dot ${connectedCount ? "" : "is-waiting"}`}
+                  />
+                  {connectedCount
+                    ? `${connectedCount + 1} connected`
+                    : group.room
+                      ? "Waiting for company"
+                      : group.joining
+                        ? "Connecting"
+                        : group.online
+                          ? "Ready to connect"
+                          : "Connecting to server"}
+                </span>
               </div>
-              <h1>{title}</h1>
-              <p>
-                {!mode
-                  ? "Choose how your next conversation begins."
-                  : group.room
-                    ? connectedCount
-                      ? "Your voices are connected. Your screens are next."
-                      : "A conversation is one code away."
-                    : mode === "create"
-                      ? "Preparing your private room..."
-                      : "Enter a six-digit code to connect."}
-              </p>
-            </div>
-            {group.room && (
-              <div className="room-code-box">
-                <span>{single ? "PAIRING CODE" : "GROUP CODE"}</span>
+              <section className="room-heading">
                 <div>
-                  <strong aria-label={`Meeting code ${group.room.code}`}>
-                    {group.room.code}
-                  </strong>
-                  <button
-                    className="m-icon"
-                    aria-label="Copy meeting code"
-                    title={copied ? "Copied" : "Copy code"}
-                    onClick={copyCode}
-                  >
-                    {copied ? <Check size={16} /> : <Copy size={16} />}
-                  </button>
+                  <div className="room-eyebrow">
+                    {single ? "A LITTLE LESS DISTANCE" : "YOUR SHARED SPACE"}
+                  </div>
+                  <h1>{title}</h1>
+                  <p>
+                    {!mode
+                      ? "Choose how your next conversation begins."
+                      : group.room
+                        ? connectedCount
+                          ? "Your voices are connected. Your screens are next."
+                          : "A conversation is one code away."
+                        : mode === "create"
+                          ? "Preparing your private room..."
+                          : "Enter a six-digit code to connect."}
+                  </p>
                 </div>
-              </div>
-            )}
-          </section>
+              </section>
+            </>
+          )}
           {!mode ? (
             <section className="meeting-entry">
               <label className="entry-name-label" htmlFor="display-name">

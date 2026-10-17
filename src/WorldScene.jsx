@@ -131,6 +131,7 @@ export default function WorldScene({ softened = false }) {
       renderer.setSize(width, height);
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
+      renderer.render(scene, camera);
     };
     const observer = new ResizeObserver(resize);
     observer.observe(host);
@@ -146,11 +147,13 @@ export default function WorldScene({ softened = false }) {
     controls.addEventListener("change", drawScene);
     const renderFrame = () => {
       const elapsed = clock.getElapsedTime();
-      if (!reduced) world.rotation.y += 0.0008;
-      for (const pulse of pulses)
-        pulse.mesh.position.copy(
-          pulse.curve.getPointAt((elapsed * 0.06 + pulse.offset) % 1),
-        );
+      if (!reduced) {
+        world.rotation.y += 0.0008;
+        for (const pulse of pulses)
+          pulse.mesh.position.copy(
+            pulse.curve.getPointAt((elapsed * 0.06 + pulse.offset) % 1),
+          );
+      }
       controls.update();
       drawScene();
       renderer.domElement.dataset.ready = "true";

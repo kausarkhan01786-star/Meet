@@ -291,4 +291,12 @@ test("meeting chat uses trusted sender identity, stays room-scoped and limits me
   assert.equal((await echo).id, message.id);
   send(member, { type: "group-chat", text: "x".repeat(2001) });
   assert.match((await receive(member)).message, /2000/);
+  for (let index = 1; index < 20; index++) {
+    const delivered = receive(host);
+    send(member, { type: "group-chat", text: `Message ${index}` });
+    await receive(member);
+    await delivered;
+  }
+  send(member, { type: "group-chat", text: "Too many" });
+  assert.match((await receive(member)).message, /wait a moment/);
 });
