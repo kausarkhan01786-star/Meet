@@ -127,8 +127,13 @@ export function createPairingService({
             do {
               code = String(randomInt(100000, 1000000));
             } while (rooms.has(code) || groups.has(code));
-            const meetingType = message.meetingType === "single" ? "single" : "group";
-            group = { members: new Map(), meetingType, limit: meetingType === "single" ? 2 : maxGroupMembers };
+            const meetingType =
+              message.meetingType === "single" ? "single" : "group";
+            group = {
+              members: new Map(),
+              meetingType,
+              limit: meetingType === "single" ? 2 : maxGroupMembers,
+            };
             groups.set(code, group);
           } else {
             group =
@@ -140,7 +145,14 @@ export function createPairingService({
                 type: "error",
                 message: "Group not found. Check the code with a group member.",
               });
-            if (message.meetingType && message.meetingType !== group.meetingType) return send(socket, { type: "error", message: "This code belongs to a different meeting type." });
+            if (
+              message.meetingType &&
+              message.meetingType !== group.meetingType
+            )
+              return send(socket, {
+                type: "error",
+                message: "This code belongs to a different meeting type.",
+              });
             if (group.members.size >= group.limit)
               return send(socket, {
                 type: "error",
@@ -171,11 +183,32 @@ export function createPairingService({
         } else if (message.type === "group-chat") {
           const group = groups.get(socket.groupCode);
           if (!group) return;
-          if (typeof message.text !== "string" || !message.text.trim() || message.text.length > 2000) return send(socket, { type: "error", message: "Messages must contain 1 to 2000 characters." });
-          socket.chatTimes = (socket.chatTimes || []).filter((time) => time > Date.now() - 10_000);
-          if (socket.chatTimes.length >= 20) return send(socket, { type: "error", message: "Please wait a moment before sending more messages." });
+          if (
+            typeof message.text !== "string" ||
+            !message.text.trim() ||
+            message.text.length > 2000
+          )
+            return send(socket, {
+              type: "error",
+              message: "Messages must contain 1 to 2000 characters.",
+            });
+          socket.chatTimes = (socket.chatTimes || []).filter(
+            (time) => time > Date.now() - 10_000,
+          );
+          if (socket.chatTimes.length >= 20)
+            return send(socket, {
+              type: "error",
+              message: "Please wait a moment before sending more messages.",
+            });
           socket.chatTimes.push(Date.now());
-          broadcastGroup(group, { type: "group-chat", id: randomUUID(), senderId: socket.memberId, name: socket.memberName, text: message.text.trim(), sentAt: Date.now() });
+          broadcastGroup(group, {
+            type: "group-chat",
+            id: randomUUID(),
+            senderId: socket.memberId,
+            name: socket.memberName,
+            text: message.text.trim(),
+            sentAt: Date.now(),
+          });
         } else if (message.type === "group-media") {
           const group = groups.get(socket.groupCode);
           if (

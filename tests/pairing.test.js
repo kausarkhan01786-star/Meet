@@ -248,10 +248,18 @@ test("single meetings accept only two members and reject mismatched meeting type
   send(extra, { type: "group-join", code: created.code, meetingType: "group" });
   assert.match((await receive(extra)).message, /different meeting type/);
   const noticed = receive(host);
-  send(receiver, { type: "group-join", code: created.code, meetingType: "single" });
+  send(receiver, {
+    type: "group-join",
+    code: created.code,
+    meetingType: "single",
+  });
   assert.equal((await receive(receiver)).members.length, 1);
   await noticed;
-  send(extra, { type: "group-join", code: created.code, meetingType: "single" });
+  send(extra, {
+    type: "group-join",
+    code: created.code,
+    meetingType: "single",
+  });
   assert.match((await receive(extra)).message, /full/);
 });
 
@@ -268,7 +276,12 @@ test("meeting chat uses trusted sender identity, stays room-scoped and limits me
   await noticed;
   send(outsider, { type: "group-chat", code: room.code, text: "Unauthorized" });
   const echo = receive(member);
-  send(member, { type: "group-chat", senderId: "spoof", name: "Spoof", text: "  Hello meeting  " });
+  send(member, {
+    type: "group-chat",
+    senderId: "spoof",
+    name: "Spoof",
+    text: "  Hello meeting  ",
+  });
   const message = await receive(host);
   assert.equal(message.type, "group-chat");
   assert.equal(message.text, "Hello meeting");
