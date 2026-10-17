@@ -22,7 +22,7 @@ On Windows PowerShell, use `npm.cmd` instead of `npm` if script execution policy
 
 The hero contains **Add Meeting**, which reveals **Single meeting** and **Group meeting** cards. Mouse/touch drag rotates the globe. Motion respects the reduced-motion preference; WebGL-unavailable browsers see a bitmap fallback.
 
-1. Open **Add Meeting > Group meeting**, optionally enter your name, select **Create group**, and allow microphone access. The fullscreen room displays its six-digit group code.
+1. Open **Add Meeting > Group meeting**, enter your required display name, select **Create group**, and allow microphone access. The fullscreen room displays its six-digit group code. A nonblank name is required for both creating and joining, enforced by the UI and server.
 2. Give the website address and code only to the intended people. They select **Add Meeting > Group meeting > Add group**. Entering all six digits starts joining automatically; **Connect** can retry a rejected code.
 3. Everyone can talk and listen at the same time. Use the microphone button to mute/unmute yourself and the speaker button to mute/unmute playback on your device. If autoplay is blocked, press the member's **Hear** button.
 4. Any member using a supported desktop Chrome/Edge browser can press **Share screen**. Multiple members can share simultaneously; their screen tiles appear separately with fullscreen controls. Screen sharing here sends video only; voices are carried by each member's microphone. Phones can join voice and view screens, but mobile browser screen capture is generally unavailable.
@@ -50,6 +50,14 @@ Camera verification used generated video over real WebRTC, checked decoded remot
 ## Meeting Chat
 
 The right-side panel has Chat and People tabs. On small screens, the chat button opens an overlay drawer. Messages are limited to 2,000 characters, sent only to members of the same room, and rendered as plain text. The server assigns sender identity and limits message bursts. Chat travels over the signaling connection (TLS on HTTPS deployments); unlike WebRTC media, it is not end-to-end encrypted from the signaling server. No server-side history is stored. Each browser keeps at most 200 messages until leaving, so late joiners do not receive earlier messages. Display names are not verified identities.
+
+## Refresh And Sound Feedback
+
+The current Single/Group view, create/receive form, display name, entered code, chat tab/drawer, meeting picker and minimized state are saved in this tab's `sessionStorage`. Refresh returns to that view instead of resetting to the hero. This does not preserve a live WebRTC connection, microphone, camera, screen capture, or chat history across a document reload.
+
+If an active call was interrupted by refresh, the same meeting page shows **Reconnect to meeting** with the previous code. Reconnection is explicit: refresh never silently requests microphone/camera/screen permissions. Rejoining succeeds only while the room still exists and has capacity; if everyone left or the server restarted, return to meeting options and create a new room. Camera and screen sharing remain off until explicitly enabled again. A refreshed minimized call says **Reconnect needed**, not connected.
+
+Short locally synthesized sound cues play for enabled button/card/link clicks, actual call connection, call/member departure, and server-confirmed sent messages. Sound requires browser user interaction; autoplay policy or device mute can suppress it. The speaker icon in the hero/header toggles **interface sounds**, independently from meeting speaker mute, and remembers the preference in `localStorage`. These cues are not added to outgoing WebRTC audio tracks; headphones avoid acoustic pickup by a physical microphone. No external audio assets are downloaded.
 
 ## Public Deployment
 
@@ -85,7 +93,7 @@ The ICE configuration endpoint provides client-usable TURN credentials. Anyone a
 
 ## Single Meetings
 
-1. Select **Add Meeting > Single meeting > Create call**. An optional display name can be entered before creating. Allow microphone access; the room shows **Make room for another screen.** and a six-digit pairing code.
+1. Select **Add Meeting > Single meeting**, enter your required display name, then choose **Create call** or **Receive call**. Blank or whitespace-only names cannot create or join a call. Allow microphone access; the created room shows **Make room for another screen.** and a six-digit pairing code.
 2. The other participant opens the same website and chooses **Single meeting > Receive call**. Filling all six digits starts connecting automatically; no screen capture is required to talk.
 3. Both participants can speak and listen, mute microphones/speakers, use chat, and later share a screen from a supported desktop browser. A Single meeting admits at most two people. Its code cannot be used in Group mode.
 4. Stopping screen sharing preserves the voice call. The red leave button releases all capture. The remaining person can wait for a replacement participant; the room is deleted when empty.

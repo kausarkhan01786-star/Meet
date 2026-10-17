@@ -1,5 +1,47 @@
 import { useEffect, useRef, useState } from "react";
-import { Expand, LoaderCircle, MicOff, VideoOff, Volume2 } from "lucide-react";
+import {
+  Expand,
+  LoaderCircle,
+  MicOff,
+  VideoOff,
+  Volume2,
+  VolumeX,
+} from "lucide-react";
+import {
+  getSoundsEnabled,
+  setSoundsEnabled,
+  unlockFeedback,
+  playFeedback,
+} from "./feedback.js";
+
+export function SoundToggle({ className = "" }) {
+  const [enabled, setEnabled] = useState(getSoundsEnabled);
+  useEffect(() => {
+    const update = () => setEnabled(getSoundsEnabled());
+    window.addEventListener("meeting-sound-preference", update);
+    return () => window.removeEventListener("meeting-sound-preference", update);
+  }, []);
+  return (
+    <button
+      className={`m-icon sound-toggle ${className}`}
+      data-sound="none"
+      aria-label={enabled ? "Mute interface sounds" : "Enable interface sounds"}
+      title={enabled ? "Mute interface sounds" : "Enable interface sounds"}
+      aria-pressed={enabled}
+      onClick={() => {
+        const next = !enabled;
+        setSoundsEnabled(next);
+        setEnabled(next);
+        if (next) {
+          unlockFeedback();
+          playFeedback("click");
+        }
+      }}
+    >
+      {enabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
+    </button>
+  );
+}
 
 export function CameraTile({
   stream,

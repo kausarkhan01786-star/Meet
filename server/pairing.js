@@ -123,6 +123,15 @@ export function createPairingService({
               message: "Leave your current session first.",
             });
           if (!allowAttempt(socket)) return;
+          const memberName =
+            typeof message.name === "string"
+              ? message.name.trim().slice(0, 40)
+              : "";
+          if (!memberName)
+            return send(socket, {
+              type: "error",
+              message: "Enter your name before creating or joining a meeting.",
+            });
           let code = message.code;
           let group;
           if (message.type === "group-create") {
@@ -163,10 +172,7 @@ export function createPairingService({
           }
           const members = [...group.members.values()].map(memberInfo);
           socket.memberId = randomUUID();
-          socket.memberName =
-            typeof message.name === "string"
-              ? message.name.trim().slice(0, 40) || "Guest"
-              : "Guest";
+          socket.memberName = memberName;
           socket.groupCode = code;
           group.members.set(socket.memberId, socket);
           send(socket, {

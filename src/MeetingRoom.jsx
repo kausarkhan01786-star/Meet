@@ -29,7 +29,13 @@ import {
   X,
 } from "lucide-react";
 import { useGroup } from "./useGroup";
-import { CameraTile, MemberAudio, SharedScreen } from "./MediaViews";
+import {
+  CameraTile,
+  MemberAudio,
+  SharedScreen,
+  SoundToggle,
+} from "./MediaViews";
+import { saveMeetingSession } from "./meetingSession.js";
 
 function ChatPanel({ group, tab, setTab, onClose }) {
   const [draft, setDraft] = useState("");
@@ -208,16 +214,25 @@ export default function MeetingRoom({
   minimized = false,
   onMinimize,
   onRestore,
+  initialSession = {},
 }) {
   const group = useGroup({ meetingType });
   const single = meetingType === "single";
-  const [mode, setMode] = useState(null);
-  const [name, setName] = useState("");
-  const [code, setCode] = useState("");
+  const [mode, setMode] = useState(initialSession.mode || null);
+  const [name, setName] = useState(initialSession.name || "");
+  const [code, setCode] = useState(
+    initialSession.roomCode || initialSession.code || "",
+  );
+  const [needsReconnect, setNeedsReconnect] = useState(
+    Boolean(initialSession.roomCode),
+  );
+  const [autoEnter, setAutoEnter] = useState(!initialSession.mode);
   const [copied, setCopied] = useState(false);
   const [speakersMuted, setSpeakersMuted] = useState(false);
-  const [chatOpen, setChatOpen] = useState(() => window.innerWidth > 1050);
-  const [tab, setTab] = useState("chat");
+  const [chatOpen, setChatOpen] = useState(
+    () => initialSession.chatOpen ?? window.innerWidth > 1050,
+  );
+  const [tab, setTab] = useState(initialSession.tab || "chat");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const attemptedCode = useRef("");
@@ -225,6 +240,18 @@ export default function MeetingRoom({
   const copyTimer = useRef(null);
   const joinedAt = useRef(0);
   const minimizedVideoRef = useRef(null);
+  const savedRoomCode = useRef(initialSession.roomCode || "");
+  useEffect(() => {
+    saveMeetingSession({
+      mode,
+      name,
+      code,
+      tab,
+      chatOpen,
+      roomCode:
+        group.room?.code || (needsReconnect ? savedRoomCode.current : ""),
+    });
+  }, [mode, name, code, tab, chatOpen, group.room?.code, needsReconnect]);
   const previewMember = group.members.find((member) => member.sharing);
   const cameraPreviewMember = group.members.find((member) => member.camera);
   const previewStream =
@@ -242,12 +269,20 @@ export default function MeetingRoom({
     };
   }, [minimized, previewStream]);
   useEffect(() => {
-    if (mode === "create" && group.online && !group.room && !creating.current) {
+    if (!autoEnter || needsReconnect) return;
+    if (
+      mode === "create" &&
+      name.trim() &&
+      group.online &&
+      !group.room &&
+      !creating.current
+    ) {
       creating.current = true;
-      group.enter("create", name.trim() || "Host", "");
+      group.enter("create", name.trim(), "");
     }
     if (
       mode === "join" &&
+      name.trim() &&
       group.online &&
       code.length === 6 &&
       !group.room &&
@@ -255,9 +290,18 @@ export default function MeetingRoom({
       attemptedCode.current !== code
     ) {
       attemptedCode.current = code;
-      group.enter("join", name.trim() || "Guest", code);
+      group.enter("join", name.trim(), code);
     }
-  }, [mode, code, group.online, group.room, group.joining, name]);
+  }, [
+    mode,
+    code,
+    group.online,
+    group.room,
+    group.joining,
+    name,
+    autoEnter,
+    needsReconnect,
+  ]);
   useEffect(() => {
     if (!group.room) {
       joinedAt.current = 0;
@@ -286,6 +330,9 @@ export default function MeetingRoom({
   }
   function leave() {
     group.leave();
+    setNeedsReconnect(false);
+    setAutoEnter(true);
+    savedRoomCode.current = "";
     setMode(null);
     setCode("");
     creating.current = false;
@@ -390,6 +437,7 @@ export default function MeetingRoom({
             </>
           )}
           <div className="header-end">
+            <SoundToggle />
             <span className="encryption-status">
               <ShieldCheck size={14} /> Encrypted media
             </span>
@@ -457,7 +505,7 @@ export default function MeetingRoom({
             {!mode ? (
               <section className="meeting-entry">
                 <label className="entry-name-label" htmlFor="display-name">
-                  YOUR NAME <span>OPTIONAL</span>
+                  YOUR NAME <span>REQUIRED</span>
                 </label>
                 <input
                   className="meeting-name-input"
@@ -465,14 +513,18 @@ export default function MeetingRoom({
                   placeholder="What should we call you?"
                   maxLength={40}
                   autoComplete="nickname"
+                  required
+                  aria-required="true"
                   value={name}
                   onChange={(event) => setName(event.target.value)}
                 />
                 <div className="entry-choice-grid">
                   <button
                     className="entry-choice"
+                    disabled={!name.trim()}
                     onClick={() => {
                       creating.current = false;
+                      setAutoEnter(true);
                       setMode("create");
                     }}
                   >
@@ -495,7 +547,11 @@ export default function MeetingRoom({
                   </button>
                   <button
                     className="entry-choice receive-entry"
-                    onClick={() => setMode("join")}
+                    disabled={!name.trim()}
+                    onClick={() => {
+                      setAutoEnter(true);
+                      setMode("join");
+                    }}
                   >
                     <span className="entry-choice-icon">
                       <LogIn size={25} strokeWidth={1.3} />
@@ -520,12 +576,45 @@ export default function MeetingRoom({
               </section>
             ) : !group.room ? (
               <div className="meeting-join-stage">
-                {mode === "join" ? (
+                {needsReconnect ? (
+                  <div className="room-preparing reconnect-panel">
+                    <Phone size={36} strokeWidth={1.2} />
+                    <h2>Your meeting page is back.</h2>
+                    <p>
+                      Refreshing disconnected the previous call. Reconnect to
+                      rejoin if someone is still in the room.
+                    </p>
+                    <span className="reconnect-code">
+                      {savedRoomCode.current}
+                    </span>
+                    <button
+                      className="connect-call-button"
+                      disabled={!group.online || !name.trim() || group.joining}
+                      onClick={() => {
+                        const previousCode = savedRoomCode.current;
+                        attemptedCode.current = previousCode;
+                        setMode("join");
+                        setCode(previousCode);
+                        setNeedsReconnect(false);
+                        setAutoEnter(true);
+                        group.enter("join", name.trim(), previousCode);
+                      }}
+                    >
+                      <Phone size={16} /> Reconnect to meeting
+                    </button>
+                    <button
+                      className="workspace-back reconnect-back"
+                      onClick={leave}
+                    >
+                      <ArrowLeft size={14} /> Meeting options
+                    </button>
+                  </div>
+                ) : mode === "join" ? (
                   <form
                     className="receive-call-form"
                     onSubmit={(event) => {
                       event.preventDefault();
-                      group.enter("join", name.trim() || "Guest", code);
+                      group.enter("join", name.trim(), code);
                     }}
                   >
                     <div className="receive-call-symbol">
@@ -550,16 +639,20 @@ export default function MeetingRoom({
                       value={code}
                       disabled={group.joining}
                       required
-                      onChange={(event) =>
+                      onChange={(event) => {
+                        setAutoEnter(true);
                         setCode(
                           event.target.value.replace(/\D/g, "").slice(0, 6),
-                        )
-                      }
+                        );
+                      }}
                     />
                     <button
                       className="connect-call-button"
                       disabled={
-                        !group.online || group.joining || code.length !== 6
+                        !group.online ||
+                        group.joining ||
+                        !name.trim() ||
+                        code.length !== 6
                       }
                     >
                       {group.joining ? (
@@ -588,9 +681,7 @@ export default function MeetingRoom({
                       <button
                         className="connect-call-button"
                         disabled={!group.online}
-                        onClick={() =>
-                          group.enter("create", name.trim() || "Host", "")
-                        }
+                        onClick={() => group.enter("create", name.trim(), "")}
                       >
                         <Plus size={15} /> Create {single ? "call" : "group"}
                       </button>
@@ -930,9 +1021,11 @@ export default function MeetingRoom({
                 <span className="tiny-dot" />
                 {group.room
                   ? `${group.members.length + 1} in call`
-                  : group.online
-                    ? "Call ended"
-                    : "Disconnected"}{" "}
+                  : needsReconnect
+                    ? "Reconnect needed"
+                    : group.online
+                      ? "Call ended"
+                      : "Disconnected"}{" "}
                 <span>/</span>{" "}
                 {String(Math.floor(elapsed / 60)).padStart(2, "0")}:
                 {String(elapsed % 60).padStart(2, "0")}

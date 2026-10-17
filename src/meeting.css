@@ -709,6 +709,42 @@ button:active:not(:disabled) {
 .meeting-workspace[hidden] {
   display: none;
 }
+.hero-sound-toggle {
+  position: absolute;
+  top: 36px;
+  right: 5%;
+  z-index: 3;
+  border: 1px solid #84738f44;
+  background: #15121c70;
+  color: #bba4cb;
+}
+.sound-toggle[aria-pressed="false"] {
+  color: #8c788e;
+}
+.reconnect-panel p {
+  margin: 14px 0;
+  font-size: 12px;
+  line-height: 1.9;
+  color: #a18aac;
+}
+.reconnect-code {
+  display: block;
+  color: #dec3f1;
+  font-size: 28px;
+  font-family: var(--heading);
+  user-select: all;
+  margin: 20px 0;
+}
+.reconnect-back {
+  margin: 18px auto 0;
+  justify-content: center;
+}
+@media (max-width: 600px) {
+  .hero-sound-toggle {
+    top: 23px;
+    right: 22px;
+  }
+}
 .meeting-header {
   height: 73px;
   display: flex;
@@ -2513,10 +2549,47 @@ button:active:not(:disabled) {
   padding-left: 15px;
 }
 .creator-credit strong {
-  color: #d9baf5;
-  font-weight: 650;
+  color: #dceac8;
+  font-size: 13px;
+  font-weight: 750;
   padding-bottom: 2px;
-  border-bottom: 1px solid #9971b9;
+  border-bottom: 1px solid #96ae76;
+}
+.creator-name-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #dceac8;
+  text-decoration: none;
+}
+.creator-name-link:hover strong {
+  color: #f0ffdf;
+  border-color: #dceac8;
+}
+.creator-socials {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.creator-socials a {
+  display: grid;
+  place-items: center;
+  width: 29px;
+  height: 29px;
+  border: 1px solid #77718445;
+  border-radius: 5px;
+  color: #bcb5c8;
+  background: #e8dcff06;
+  text-decoration: none;
+  transition:
+    color 0.2s,
+    background 0.2s,
+    border-color 0.2s;
+}
+.creator-socials a:hover {
+  color: #dceac8;
+  background: #b6d98a12;
+  border-color: #8da572;
 }
 .camera-grid {
   display: grid;
@@ -2678,6 +2751,27 @@ button:active:not(:disabled) {
     bottom: 13px;
     gap: 10px;
     font-size: 9px;
+    right: 27px;
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    row-gap: 9px;
+  }
+  .creator-socials {
+    grid-column: 1 / -1;
+    gap: 8px;
+  }
+  .creator-socials a {
+    width: 28px;
+    height: 28px;
+  }
+  .meeting-home .hero-copy {
+    bottom: 112px;
+  }
+  .meeting-home.has-minimized-call {
+    min-height: 100svh;
+  }
+  .has-minimized-call .hero-copy {
+    bottom: 245px;
   }
   .creator-credit > span + span {
     padding-left: 10px;

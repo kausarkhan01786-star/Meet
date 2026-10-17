@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { loadRtcConfiguration } from "./useCast.js";
+import { playFeedback } from "./feedback.js";
 
 export function mediaSlot(transceiver, transceivers) {
   if (transceiver.receiver.track.kind === "audio") return "audio";
@@ -149,6 +150,10 @@ export function useGroup({ meetingType = "group" } = {}) {
     peer.onconnectionstatechange = () => {
       if (peersRef.current.get(id) !== entry) return;
       setConnections((current) => ({ ...current, [id]: peer.connectionState }));
+      if (peer.connectionState === "connected" && !entry.connectedFeedback) {
+        entry.connectedFeedback = true;
+        playFeedback("connected");
+      }
       if (peer.connectionState === "failed")
         setError(
           "A member connection failed. Rejoin the group; different networks may require a working TURN relay.",
@@ -178,6 +183,7 @@ export function useGroup({ meetingType = "group" } = {}) {
     socket.onerror = () => socket.close();
     socket.onclose = () => {
       if (!active) return;
+      if (roomRef.current) playFeedback("ended");
       release();
       clearView();
       setOnline(false);
@@ -214,6 +220,8 @@ export function useGroup({ meetingType = "group" } = {}) {
               });
             }
           } else if (message.type === "group-chat" && roomRef.current) {
+            if (message.senderId === roomRef.current.selfId)
+              playFeedback("sent");
             setMessages((current) => [...current.slice(-199), message]);
           } else if (message.type === "group-member-joined") {
             setMembers((current) => [
@@ -234,6 +242,7 @@ export function useGroup({ meetingType = "group" } = {}) {
               ),
             );
           } else if (message.type === "group-member-left") {
+            playFeedback("ended");
             closePeer(message.id);
             setMembers((current) =>
               current.filter((member) => member.id !== message.id),
@@ -309,6 +318,9 @@ export function useGroup({ meetingType = "group" } = {}) {
   async function enter(mode, name, code) {
     if (!online || busyRef.current || enteringRef.current || roomRef.current)
       return;
+    const displayName = typeof name === "string" ? name.trim() : "";
+    if (!displayName)
+      return setError("Enter your name before creating or joining a meeting.");
     if (!window.isSecureContext || !window.RTCPeerConnection)
       return setError(
         "Group voice needs HTTPS. Open the HTTPS phone address shown on the PC, or localhost on the PC.",
@@ -344,7 +356,7 @@ export function useGroup({ meetingType = "group" } = {}) {
       if (
         !send({
           type: mode === "create" ? "group-create" : "group-join",
-          name,
+          name: displayName,
           code,
           meetingType,
         })
@@ -470,6 +482,7 @@ export function useGroup({ meetingType = "group" } = {}) {
     }
   }
   function leave() {
+    if (roomRef.current) playFeedback("ended");
     send({ type: "leave" });
     release();
     clearView();

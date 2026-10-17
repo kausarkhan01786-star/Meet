@@ -1,9 +1,13 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
   ArrowUpRight,
   AudioLines,
+  Facebook,
+  Github,
+  Instagram,
+  Linkedin,
   Plus,
   Users,
   UserRound,
@@ -11,18 +15,39 @@ import {
 } from "lucide-react";
 import WorldScene from "./WorldScene";
 import MeetingRoom from "./MeetingRoom";
+import { SoundToggle } from "./MediaViews";
+import { readMeetingSession, saveMeetingSession } from "./meetingSession.js";
+import { installInteractionFeedback } from "./feedback.js";
 
 export default function MeetingApp() {
-  const [view, setView] = useState("home");
-  const [minimized, setMinimized] = useState(false);
+  const [initialSession] = useState(readMeetingSession);
+  const [view, setView] = useState(initialSession.view);
+  const [minimized, setMinimized] = useState(
+    initialSession.view !== "home" && initialSession.minimized,
+  );
   const dialogRef = useRef(null);
-  const [optionsOpen, setOptionsOpen] = useState(false);
+  const [optionsOpen, setOptionsOpen] = useState(initialSession.pickerOpen);
+  useEffect(() => installInteractionFeedback(), []);
+  useEffect(() => {
+    saveMeetingSession({ view, minimized, pickerOpen: optionsOpen });
+  }, [view, minimized, optionsOpen]);
+  useEffect(() => {
+    if (optionsOpen && dialogRef.current && !dialogRef.current.open)
+      dialogRef.current.showModal();
+  }, [optionsOpen, view, minimized]);
   function closeOptions() {
     dialogRef.current?.close();
     setOptionsOpen(false);
   }
   function choose(type) {
     closeOptions();
+    saveMeetingSession({
+      view: type,
+      minimized: false,
+      mode: null,
+      code: "",
+      roomCode: "",
+    });
     setView(type);
     setMinimized(false);
   }
@@ -32,10 +57,18 @@ export default function MeetingApp() {
         <MeetingRoom
           key={view}
           meetingType={view}
+          initialSession={readMeetingSession()}
           minimized={minimized}
           onMinimize={() => setMinimized(true)}
           onRestore={() => setMinimized(false)}
           onBack={() => {
+            saveMeetingSession({
+              view: "home",
+              minimized: false,
+              mode: null,
+              code: "",
+              roomCode: "",
+            });
             setView("home");
             setMinimized(false);
           }}
@@ -46,6 +79,7 @@ export default function MeetingApp() {
           className={`meeting-home ${minimized ? "has-minimized-call" : ""}`}
         >
           <WorldScene softened={optionsOpen} />
+          <SoundToggle className="hero-sound-toggle" />
           <div className="hero-brand">
             <AudioLines size={23} strokeWidth={1.7} />
             <span>
@@ -86,8 +120,59 @@ export default function MeetingApp() {
           <footer className="creator-credit">
             <span>&copy; {new Date().getFullYear()} Meeting.</span>
             <span>
-              Created by <strong>Kausar mia</strong>
+              Created by{" "}
+              <a
+                className="creator-name-link"
+                href="https://kausarmia.web.app/"
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Kausar mia's portfolio"
+              >
+                <strong>Kausar mia</strong>
+                <ArrowUpRight size={12} />
+              </a>
             </span>
+            <nav
+              className="creator-socials"
+              aria-label="Kausar mia's social links"
+            >
+              <a
+                href="https://github.com/kausar017"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Kausar mia on GitHub"
+                title="Kausar mia on GitHub"
+              >
+                <Github size={15} />
+              </a>
+              <a
+                href="https://www.facebook.com/kausar017"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Kausar mia on Facebook"
+                title="Kausar mia on Facebook"
+              >
+                <Facebook size={15} />
+              </a>
+              <a
+                href="https://www.instagram.com/md.kousar_mia/"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Kausar mia on Instagram"
+                title="Kausar mia on Instagram"
+              >
+                <Instagram size={15} />
+              </a>
+              <a
+                href="https://www.linkedin.com/in/kausar-mia-developer/"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Kausar mia on LinkedIn"
+                title="Kausar mia on LinkedIn"
+              >
+                <Linkedin size={15} />
+              </a>
+            </nav>
           </footer>
           <dialog
             className="meeting-picker"

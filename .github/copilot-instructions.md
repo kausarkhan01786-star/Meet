@@ -23,6 +23,8 @@
 - Meeting UI: hero-only Three.js Earth home, Add Meeting reveals Single/Group cards, fullscreen voice-first rooms, and right-side chat with mobile drawer. Chat is scoped to the room, length/rate-limited, not persisted and not end-to-end encrypted from the signaling server.
 - Keep active rooms mounted when Home minimizes them; restoring must reuse the same peers and media. Only explicit Leave/End, tab close/reload, or signaling loss ends capture. Shared-screen stages are capped at 1540x725px with responsive containment; native fullscreen remains available.
 - Camera capture is opt-in via the camera button. Keep microphone, screen video and camera video on separate negotiated transceiver slots; camera off must stop camera tracks without ending voice or screen sharing. Home credit highlights Kausar mia with a copyright symbol.
+- Names are required for Single and Group creation/joining: validate trimmed nonblank names on the client and server, without Host/Guest admission fallbacks. Creator credit links to Kausar mia's provided portfolio, GitHub, Facebook, Instagram and LinkedIn in new tabs with safe rel attributes.
+- Persist tab-local navigation/form/panel state on refresh. An interrupted active call restores to an explicit Reconnect view; never claim live media survived reload or silently restart capture. Short optional interface/call/message cues use local Web Audio and must respect browser interaction/autoplay restrictions and the sound toggle.
 
 # Verification
 

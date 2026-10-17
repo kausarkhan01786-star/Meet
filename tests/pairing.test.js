@@ -222,7 +222,7 @@ test("groups admit multiple members, relay targeted messages and survive creator
   send(second, { type: "leave" });
   await thirdSawLeave;
   send(third, { type: "leave" });
-  send(third, { type: "group-join", code: created.code });
+  send(third, { type: "group-join", code: created.code, name: "Third" });
   assert.match((await receive(third)).message, /not found/);
 });
 
@@ -238,11 +238,11 @@ test("group codes are isolated from paired sessions and enforce capacity", async
   send(extra, { type: "join", code });
   assert.equal((await receive(extra)).type, "error");
   const noticed = receive(creator);
-  send(member, { type: "group-join", code });
+  send(member, { type: "group-join", code, name: "Member" });
   const joined = await receive(member);
   assert.equal(joined.members[0].name.length, 40);
   await noticed;
-  send(extra, { type: "group-join", code });
+  send(extra, { type: "group-join", code, name: "Extra" });
   assert.match((await receive(extra)).message, /full/);
   send(member, { type: "create" });
   assert.match((await receive(member)).message, /Leave/);
@@ -261,7 +261,7 @@ test("late joiners receive camera status without replacing screen-sharing status
     camera: true,
   });
   const noticed = receive(host);
-  send(guest, { type: "group-join", code });
+  send(guest, { type: "group-join", code, name: "Guest" });
   const room = await receive(guest);
   assert.equal(room.members[0].camera, true);
   assert.equal(room.members[0].sharing, true);
@@ -286,13 +286,19 @@ test("single meetings accept only two members and reject mismatched meeting type
   const created = await receive(host);
   assert.equal(created.limit, 2);
   assert.equal(created.meetingType, "single");
-  send(extra, { type: "group-join", code: created.code, meetingType: "group" });
+  send(extra, {
+    type: "group-join",
+    code: created.code,
+    meetingType: "group",
+    name: "Extra",
+  });
   assert.match((await receive(extra)).message, /different meeting type/);
   const noticed = receive(host);
   send(receiver, {
     type: "group-join",
     code: created.code,
     meetingType: "single",
+    name: "Receiver",
   });
   assert.equal((await receive(receiver)).members.length, 1);
   await noticed;
@@ -300,6 +306,7 @@ test("single meetings accept only two members and reject mismatched meeting type
     type: "group-join",
     code: created.code,
     meetingType: "single",
+    name: "Extra",
   });
   assert.match((await receive(extra)).message, /full/);
 });
@@ -340,4 +347,22 @@ test("meeting chat uses trusted sender identity, stays room-scoped and limits me
   }
   send(member, { type: "group-chat", text: "Too many" });
   assert.match((await receive(member)).message, /wait a moment/);
+});
+
+test("meeting create and join require a nonblank name and trim accepted names", async (context) => {
+  const { client, receive, send } = await setup(context, { maxAttempts: 100 });
+  const host = await client();
+  const guest = await client();
+  send(host, { type: "group-create", name: "Host" });
+  const { code } = await receive(host);
+  for (const name of [undefined, null, "", "   ", "\t\n", 42]) {
+    for (const type of ["group-create", "group-join"]) {
+      send(guest, { type, code, name });
+      assert.match((await receive(guest)).message, /Enter your name/);
+    }
+  }
+  const noticed = receive(host);
+  send(guest, { type: "group-join", code, name: "  Kausar mia  " });
+  assert.equal((await receive(guest)).type, "group-joined");
+  assert.equal((await noticed).member.name, "Kausar mia");
 });
