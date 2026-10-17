@@ -8,9 +8,8 @@ import {
   Github,
   Instagram,
   Linkedin,
+  LogIn,
   Plus,
-  Users,
-  UserRound,
   X,
 } from "lucide-react";
 import WorldScene from "./WorldScene";
@@ -39,16 +38,16 @@ export default function MeetingApp() {
     dialogRef.current?.close();
     setOptionsOpen(false);
   }
-  function choose(type) {
+  function choose(mode) {
     closeOptions();
     saveMeetingSession({
-      view: type,
+      view: "group",
       minimized: false,
-      mode: null,
+      mode,
       code: "",
       roomCode: "",
     });
-    setView(type);
+    setView("group");
     setMinimized(false);
   }
   return (
@@ -112,7 +111,9 @@ export default function MeetingApp() {
               <span className="button-plus">
                 <Plus size={19} />
               </span>
-              <span>{minimized ? "Return to Meeting" : "Add Meeting"}</span>
+              <span>
+                {minimized ? "Return to Meeting" : "Create a meeting"}
+              </span>
               <ArrowUpRight size={20} />
               <span className="button-shimmer" aria-hidden="true" />
             </button>
@@ -184,7 +185,7 @@ export default function MeetingApp() {
           >
             <div className="picker-top">
               <span>
-                <AudioLines size={17} /> MAKE A LITTLE ROOM
+                <AudioLines size={17} /> YOUR NEXT CONVERSATION
               </span>
               <button
                 className="m-icon"
@@ -195,52 +196,43 @@ export default function MeetingApp() {
                 <X size={20} />
               </button>
             </div>
-            <h2>How are we meeting?</h2>
-            <p>One good conversation starts here.</p>
+            <h2>Create or join a meeting</h2>
+            <p>Choose how you would like to get started.</p>
             <div className="meeting-choice-grid">
               <button
-                className="meeting-choice single-choice"
-                onClick={() => choose("single")}
+                className="meeting-choice create-choice"
+                onClick={() => choose("create")}
               >
-                <span className="choice-number">01 / JUST THE TWO OF YOU</span>
-                <div className="choice-art two-people" aria-hidden="true">
-                  <span>
-                    <UserRound size={37} strokeWidth={1.1} />
-                  </span>
-                  <i />
-                  <span>
-                    <UserRound size={37} strokeWidth={1.1} />
-                  </span>
+                <span className="choice-number">01 / START SOMETHING NEW</span>
+                <div className="choice-art" aria-hidden="true">
+                  <Plus size={67} strokeWidth={1} />
                 </div>
                 <span className="choice-title">
-                  Single meeting <ArrowUpRight size={24} />
+                  Create new meeting <ArrowUpRight size={24} />
                 </span>
                 <span className="choice-description">
-                  A conversation, without the crowd.
+                  Open a meeting and invite others with a code.
                 </span>
                 <span className="choice-action">
-                  Create or receive a call <ArrowRight size={17} />
+                  Create your meeting <ArrowRight size={17} />
                 </span>
               </button>
               <button
-                className="meeting-choice group-choice"
-                onClick={() => choose("group")}
+                className="meeting-choice join-choice"
+                onClick={() => choose("join")}
               >
-                <span className="choice-number">02 / BRING YOUR PEOPLE</span>
-                <div className="choice-art group-people" aria-hidden="true">
-                  <Users size={83} strokeWidth={0.8} />
-                  <span className="choice-small-plus">
-                    <Plus size={19} />
-                  </span>
+                <span className="choice-number">02 / MEET YOUR PEOPLE</span>
+                <div className="choice-art" aria-hidden="true">
+                  <LogIn size={67} strokeWidth={1} />
                 </div>
                 <span className="choice-title">
-                  Group meeting <ArrowUpRight size={24} />
+                  Join meeting <ArrowUpRight size={24} />
                 </span>
                 <span className="choice-description">
-                  Different places. One shared space.
+                  Enter the six-digit code you received.
                 </span>
                 <span className="choice-action">
-                  Create or join a group <ArrowRight size={17} />
+                  Join with a code <ArrowRight size={17} />
                 </span>
               </button>
             </div>

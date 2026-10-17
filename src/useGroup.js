@@ -18,6 +18,7 @@ export function useGroup({ meetingType = "group" } = {}) {
   const [members, setMembers] = useState([]);
   const [streams, setStreams] = useState({});
   const [cameraStreams, setCameraStreams] = useState({});
+  const [localAudio, setLocalAudio] = useState(null);
   const [localCamera, setLocalCamera] = useState(null);
   const [cameraOn, setCameraOn] = useState(false);
   const [connections, setConnections] = useState({});
@@ -83,6 +84,7 @@ export function useGroup({ meetingType = "group" } = {}) {
     setMembers([]);
     setStreams({});
     setCameraStreams({});
+    setLocalAudio(null);
     setLocalCamera(null);
     setCameraOn(false);
     setConnections({});
@@ -352,6 +354,7 @@ export function useGroup({ meetingType = "group" } = {}) {
         return;
       }
       micRef.current = voice || null;
+      setLocalAudio(voice || null);
       setMuted(!voice);
       if (
         !send({
@@ -404,6 +407,7 @@ export function useGroup({ meetingType = "group" } = {}) {
           return;
         }
         micRef.current = voice;
+        setLocalAudio(voice);
         await replaceKind("audio", voice.getAudioTracks()[0]);
         setMuted(false);
       } else {
@@ -562,6 +566,7 @@ export function useGroup({ meetingType = "group" } = {}) {
     members,
     streams,
     cameraStreams,
+    localAudio,
     localCamera,
     cameraOn,
     toggleCamera,

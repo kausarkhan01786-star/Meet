@@ -14,6 +14,20 @@ import {
   playFeedback,
 } from "./feedback.js";
 
+let audioActivityContext;
+
+function unlockAudioActivity() {
+  if (!window.AudioContext) return;
+  audioActivityContext ||= new window.AudioContext();
+  if (audioActivityContext.state === "suspended")
+    void audioActivityContext.resume().catch(() => {});
+}
+
+if (typeof window !== "undefined") {
+  window.addEventListener("pointerdown", unlockAudioActivity, true);
+  window.addEventListener("keydown", unlockAudioActivity, true);
+}
+
 export function SoundToggle({ className = "" }) {
   const [enabled, setEnabled] = useState(getSoundsEnabled);
   useEffect(() => {
@@ -41,6 +55,53 @@ export function SoundToggle({ className = "" }) {
       {enabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
     </button>
   );
+}
+
+export function useAudioActivity(stream, enabled) {
+  const [speaking, setSpeaking] = useState(false);
+  useEffect(() => {
+    const tracks = stream?.getAudioTracks().filter(
+      (track) => track.readyState === "live",
+    );
+    if (!enabled || !tracks?.length || !window.AudioContext) {
+      setSpeaking(false);
+      return;
+    }
+
+    unlockAudioActivity();
+    const context = audioActivityContext;
+    const source = context.createMediaStreamSource(new MediaStream(tracks));
+    const analyser = context.createAnalyser();
+    analyser.fftSize = 512;
+    source.connect(analyser);
+    void context.resume().catch(() => {});
+
+    const samples = new Uint8Array(analyser.fftSize);
+    let frame = 0;
+    let speakingUntil = 0;
+    const updateActivity = () => {
+      analyser.getByteTimeDomainData(samples);
+      let energy = 0;
+      for (const sample of samples) {
+        const amplitude = (sample - 128) / 128;
+        energy += amplitude * amplitude;
+      }
+      const now = performance.now();
+      if (Math.sqrt(energy / samples.length) > 0.035)
+        speakingUntil = now + 250;
+      const active = now < speakingUntil;
+      setSpeaking((current) => (current === active ? current : active));
+      frame = requestAnimationFrame(updateActivity);
+    };
+    updateActivity();
+
+    return () => {
+      cancelAnimationFrame(frame);
+      source.disconnect();
+      analyser.disconnect();
+    };
+  }, [stream, enabled]);
+  return speaking;
 }
 
 export function CameraTile({

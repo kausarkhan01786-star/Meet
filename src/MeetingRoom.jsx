@@ -34,6 +34,7 @@ import {
   MemberAudio,
   SharedScreen,
   SoundToggle,
+  useAudioActivity,
 } from "./MediaViews";
 import { saveMeetingSession } from "./meetingSession.js";
 
@@ -205,6 +206,47 @@ function ChatPanel({ group, tab, setTab, onClose }) {
         </div>
       )}
     </aside>
+  );
+}
+
+function VoiceParticipant({
+  name,
+  avatarName = name,
+  local = false,
+  tone = 0,
+  muted,
+  stream,
+  connected,
+}) {
+  const speaking = useAudioActivity(stream, !muted);
+  const status = muted
+    ? "Microphone off"
+    : speaking
+      ? "Speaking"
+      : local
+        ? "Microphone on"
+        : connected
+          ? "Connected"
+          : "Connecting...";
+  return (
+    <div
+      role="group"
+      className={`voice-person ${local ? "" : `tone-${tone}`} ${muted ? "is-muted" : ""} ${speaking ? "is-speaking" : ""}`}
+      aria-label={`${name}: ${status}`}
+    >
+      <div className="voice-avatar">
+        <span>{avatarName.slice(0, 2).toUpperCase()}</span>
+        <i />
+        <i />
+        <i />
+      </div>
+      <strong>
+        {name}
+        {muted && <MicOff size={12} />}
+        {local && !muted && <Mic size={12} />}
+      </strong>
+      <small>{status}</small>
+    </div>
   );
 }
 
@@ -532,7 +574,7 @@ export default function MeetingRoom({
                       <Plus size={25} strokeWidth={1.3} />
                     </span>
                     <strong>
-                      {single ? "Create call" : "Create group"}
+                      {single ? "Create call" : "Create new meeting"}
                       <ArrowUpRightIcon />
                     </strong>
                     <small>
@@ -541,7 +583,7 @@ export default function MeetingRoom({
                         : "One code. Everyone you want here."}
                     </small>
                     <span className="entry-choice-bottom">
-                      {single ? "Start your conversation" : "Start your group"}
+                      {single ? "Start your conversation" : "Start your meeting"}
                       <ArrowRight size={17} />
                     </span>
                   </button>
@@ -557,7 +599,7 @@ export default function MeetingRoom({
                       <LogIn size={25} strokeWidth={1.3} />
                     </span>
                     <strong>
-                      {single ? "Receive call" : "Add group"}
+                      {single ? "Receive call" : "Join meeting"}
                       <ArrowUpRightIcon />
                     </strong>
                     <small>
@@ -568,7 +610,7 @@ export default function MeetingRoom({
                     <span className="entry-choice-bottom">
                       {single
                         ? "Enter a pairing code"
-                        : "Join with a group code"}
+                        : "Join with a meeting code"}
                       <ArrowRight size={17} />
                     </span>
                   </button>
@@ -618,18 +660,32 @@ export default function MeetingRoom({
                     }}
                   >
                     <div className="receive-call-symbol">
-                      <Phone size={31} strokeWidth={1.2} />
+                      <LogIn size={31} strokeWidth={1.2} />
                     </div>
                     <h2>
                       {single
                         ? "You're six digits away."
-                        : "Your group is six digits away."}
+                        : "Join your meeting."}
                     </h2>
-                    <label htmlFor="meeting-code">
-                      {single ? "PAIRING CODE" : "GROUP CODE"}
+                    <label htmlFor="join-display-name">
+                      YOUR NAME <span>REQUIRED</span>
                     </label>
                     <input
+                      id="join-display-name"
+                      className="name-input"
+                      placeholder="What should we call you?"
+                      maxLength={40}
+                      autoComplete="nickname"
+                      required
                       autoFocus
+                      value={name}
+                      disabled={group.joining}
+                      onChange={(event) => setName(event.target.value)}
+                    />
+                    <label htmlFor="meeting-code">
+                      {single ? "PAIRING CODE" : "MEETING CODE"}
+                    </label>
+                    <input
                       id="meeting-code"
                       inputMode="numeric"
                       autoComplete="off"
@@ -668,25 +724,46 @@ export default function MeetingRoom({
                     </span>
                   </form>
                 ) : (
-                  <div className="room-preparing">
-                    <AudioLines size={45} strokeWidth={1} />
-                    <h2>
-                      {group.joining
-                        ? "Finding a little room..."
-                        : group.error
-                          ? "Let's try that again."
-                          : "Preparing your room..."}
-                    </h2>
-                    {!group.joining && (
-                      <button
-                        className="connect-call-button"
-                        disabled={!group.online}
-                        onClick={() => group.enter("create", name.trim(), "")}
-                      >
-                        <Plus size={15} /> Create {single ? "call" : "group"}
-                      </button>
-                    )}
-                  </div>
+                  <form
+                    className="receive-call-form"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      group.enter("create", name.trim(), "");
+                    }}
+                  >
+                    <div className="receive-call-symbol">
+                      <Plus size={31} strokeWidth={1.2} />
+                    </div>
+                    <h2>Create a new meeting.</h2>
+                    <label htmlFor="create-display-name">
+                      YOUR NAME <span>REQUIRED</span>
+                    </label>
+                    <input
+                      id="create-display-name"
+                      className="name-input"
+                      placeholder="What should we call you?"
+                      maxLength={40}
+                      autoComplete="nickname"
+                      required
+                      autoFocus
+                      value={name}
+                      disabled={group.joining}
+                      onChange={(event) => setName(event.target.value)}
+                    />
+                    <button
+                      className="connect-call-button"
+                      disabled={
+                        !group.online || group.joining || !name.trim()
+                      }
+                    >
+                      {group.joining ? (
+                        <LoaderCircle className="spin" size={16} />
+                      ) : (
+                        <Plus size={16} />
+                      )}
+                      {group.joining ? "Creating..." : "Create meeting"}
+                    </button>
+                  </form>
                 )}
               </div>
             ) : (
@@ -728,57 +805,24 @@ export default function MeetingRoom({
                       </span>
                     </div>
                     <div className="voice-members">
-                      <div
-                        className={`voice-person ${group.muted ? "is-muted" : ""}`}
-                      >
-                        <div className="voice-avatar">
-                          <span>
-                            {(
-                              name.trim() ||
-                              (mode === "create" ? "Host" : "Guest")
-                            )
-                              .slice(0, 2)
-                              .toUpperCase()}
-                          </span>
-                          <i />
-                          <i />
-                          <i />
-                        </div>
-                        <strong>
-                          You{" "}
-                          <span>
-                            {group.muted ? (
-                              <MicOff size={12} />
-                            ) : (
-                              <Mic size={12} />
-                            )}
-                          </span>
-                        </strong>
-                        <small>
-                          {group.muted ? "Microphone off" : "Microphone on"}
-                        </small>
-                      </div>
+                      <VoiceParticipant
+                        name="You"
+                        avatarName={name.trim() || "You"}
+                        local
+                        muted={group.muted}
+                        stream={group.localAudio}
+                      />
                       {group.members.map((member, index) => (
-                        <div
-                          className={`voice-person tone-${index % 3} ${member.muted ? "is-muted" : ""}`}
+                        <VoiceParticipant
                           key={member.id}
-                        >
-                          <div className="voice-avatar">
-                            <span>{member.name.slice(0, 2).toUpperCase()}</span>
-                            <i />
-                            <i />
-                            <i />
-                          </div>
-                          <strong>
-                            {member.name}
-                            {member.muted && <MicOff size={12} />}
-                          </strong>
-                          <small>
-                            {group.connections[member.id] === "connected"
-                              ? "Connected"
-                              : "Connecting..."}
-                          </small>
-                        </div>
+                          name={member.name}
+                          tone={index % 3}
+                          muted={member.muted}
+                          stream={group.streams[member.id]}
+                          connected={
+                            group.connections[member.id] === "connected"
+                          }
+                        />
                       ))}
                     </div>
                     <div className="voice-room-message">

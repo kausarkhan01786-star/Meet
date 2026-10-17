@@ -316,7 +316,7 @@ button:active:not(:disabled) {
     transform 0.25s;
   animation: choice-reveal 0.6s 0.07s both;
 }
-.meeting-choice.group-choice {
+.meeting-choice.join-choice {
   background: linear-gradient(140deg, #20312e, #192421);
   border-color: #3e5a50;
   animation-delay: 0.16s;
@@ -325,7 +325,7 @@ button:active:not(:disabled) {
   border-color: #d5b2f2;
   transform: translateY(-4px);
 }
-.meeting-choice.group-choice:hover {
+.meeting-choice.join-choice:hover {
   border-color: #acd3ba;
 }
 .choice-number {
@@ -333,7 +333,7 @@ button:active:not(:disabled) {
   color: #baa5cd;
   letter-spacing: 1.1px;
 }
-.group-choice .choice-number {
+.join-choice .choice-number {
   color: #9db9aa;
 }
 .choice-art {
@@ -344,49 +344,6 @@ button:active:not(:disabled) {
   gap: 17px;
   color: #c3a6dd;
   position: relative;
-}
-.two-people > span {
-  height: 67px;
-  width: 67px;
-  display: grid;
-  place-items: center;
-  border: 1px solid #8a689f70;
-  border-radius: 50%;
-  background: #b995e00a;
-}
-.two-people > span:last-child {
-  border-color: #a1b9b660;
-  color: #b4cfcd;
-  transform: translateY(9px);
-}
-.two-people i {
-  width: 28px;
-  height: 1px;
-  background: #a389b966;
-  position: relative;
-}
-.two-people i:after {
-  content: "";
-  position: absolute;
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: #dac4e9;
-  animation: connection-travel 2.8s infinite;
-}
-.group-people {
-  color: #a6cab5;
-}
-.choice-small-plus {
-  width: 28px;
-  height: 28px;
-  border: 1px solid #729e8070;
-  background: #253c30;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  margin-top: 31px;
-  margin-left: -27px;
 }
 .choice-title {
   font-family: var(--heading);
@@ -400,7 +357,7 @@ button:active:not(:disabled) {
 .choice-title > svg {
   color: #a38bae;
 }
-.group-choice .choice-title > svg {
+.join-choice .choice-title > svg {
   color: #88a593;
 }
 .choice-description {
@@ -410,7 +367,7 @@ button:active:not(:disabled) {
   line-height: 1.8;
   margin-bottom: 23px;
 }
-.group-choice .choice-description {
+.join-choice .choice-description {
   color: #93a99f;
 }
 .choice-action {
@@ -424,7 +381,7 @@ button:active:not(:disabled) {
   font-size: 11px;
   gap: 10px;
 }
-.group-choice .choice-action {
+.join-choice .choice-action {
   border-color: #abd2b51a;
   color: #bfd5c5;
 }
@@ -487,21 +444,6 @@ button:active:not(:disabled) {
   85%,
   100% {
     left: 150%;
-  }
-}
-@keyframes connection-travel {
-  from {
-    left: 0;
-    top: -1px;
-    opacity: 0;
-  }
-  20% {
-    opacity: 1;
-  }
-  to {
-    left: 100%;
-    top: -1px;
-    opacity: 0;
   }
 }
 @media (min-width: 1600px) {
@@ -621,19 +563,6 @@ button:active:not(:disabled) {
     height: 105px;
     gap: 8px;
   }
-  .two-people > span {
-    width: 40px;
-    height: 40px;
-  }
-  .two-people > span svg {
-    width: 26px;
-  }
-  .two-people i {
-    width: 12px;
-  }
-  .group-people > svg {
-    width: 65px;
-  }
   .choice-title {
     font-size: 16px;
     line-height: 1.5;
@@ -701,7 +630,9 @@ button:active:not(:disabled) {
   border: 0;
 }
 .meeting-workspace {
-  min-height: 100dvh;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
   background: #101015;
   display: flex;
   flex-direction: column;
@@ -826,15 +757,17 @@ button:active:not(:disabled) {
 .meeting-workspace-body {
   display: flex;
   flex: 1;
-  min-height: calc(100dvh - 73px);
+  min-height: 0;
 }
 .meeting-main {
   flex: 1;
   min-width: 0;
+  min-height: 0;
   position: relative;
   display: flex;
   flex-direction: column;
   padding: 25px 35px 0;
+  overflow-y: auto;
 }
 .room-topline {
   display: flex;
@@ -1111,19 +1044,30 @@ button:active:not(:disabled) {
   inset: -9px;
   border-radius: 50%;
   z-index: -1;
-  animation: voice-ring 3s ease-out infinite;
 }
-.voice-avatar > i:nth-of-type(2) {
+.voice-avatar > i:nth-of-type(2),
+.voice-avatar > i:nth-of-type(3) {
   inset: -19px;
-  animation-delay: 1s;
 }
 .voice-avatar > i:nth-of-type(3) {
   inset: -29px;
-  animation-delay: 2s;
+}
+.voice-person.is-speaking .voice-avatar {
+  border-color: #d0b0ed;
+  box-shadow: 0 0 0 4px #b98bdf1a;
+}
+.voice-person.is-speaking .voice-avatar > i {
+  border-color: #c6a3e36b;
+  animation: voice-ring 1.2s ease-out infinite;
 }
 .voice-person.is-muted .voice-avatar > i {
   animation: none;
-  opacity: 0.25;
+}
+.voice-person.is-speaking .voice-avatar > i:nth-of-type(2) {
+  animation-delay: 0.2s;
+}
+.voice-person.is-speaking .voice-avatar > i:nth-of-type(3) {
+  animation-delay: 0.4s;
 }
 .voice-person.tone-0 .voice-avatar {
   background: #4a77532a;
@@ -1132,6 +1076,9 @@ button:active:not(:disabled) {
 }
 .voice-person.tone-0 .voice-avatar > i {
   border-color: #a4c88d18;
+}
+.voice-person.tone-0.is-speaking .voice-avatar > i {
+  border-color: #a4c88d80;
 }
 .voice-person.tone-1 .voice-avatar {
   background: #3a62782a;
@@ -1142,6 +1089,12 @@ button:active:not(:disabled) {
   background: #7862422a;
   color: #d6c8ad;
   border-color: #ad987366;
+}
+.voice-person.tone-1.is-speaking .voice-avatar > i {
+  border-color: #9cc1d580;
+}
+.voice-person.tone-2.is-speaking .voice-avatar > i {
+  border-color: #d1b58a80;
 }
 .voice-person > strong {
   display: flex;
@@ -1163,6 +1116,9 @@ button:active:not(:disabled) {
   font-size: 9px;
   color: #7f6d8e;
   margin-top: 3px;
+}
+.voice-person.is-speaking > small {
+  color: #cfafe8;
 }
 .voice-room-message {
   text-align: center;
@@ -1205,7 +1161,12 @@ button:active:not(:disabled) {
   min-height: 88px;
   border-top: 1px solid #ffffff09;
   margin-top: auto;
-  position: relative;
+  padding-bottom: env(safe-area-inset-bottom);
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  flex-shrink: 0;
+  background: #101015;
 }
 .call-bottom-info {
   display: flex;
@@ -1605,6 +1566,18 @@ button:active:not(:disabled) {
 .receive-call-form input::placeholder {
   color: #51405f;
 }
+.receive-call-form input.name-input {
+  height: 44px;
+  margin-bottom: 24px;
+  text-align: left;
+  font-family: inherit;
+  font-size: 12px;
+  font-variant-numeric: normal;
+  color: #dacbe5;
+}
+.receive-call-form input.name-input::placeholder {
+  color: #74647f;
+}
 .connect-call-button {
   height: 41px;
   display: flex;
@@ -1817,6 +1790,7 @@ button:active:not(:disabled) {
     opacity: 0.2;
     scale: 0.99;
   }
+
   50% {
     opacity: 0.7;
     scale: 1.025;
@@ -1975,9 +1949,6 @@ button:active:not(:disabled) {
   }
   .header-end .m-icon {
     width: 29px;
-  }
-  .meeting-workspace-body {
-    min-height: calc(100dvh - 67px);
   }
   .meeting-main {
     padding: 22px 22px 0;
