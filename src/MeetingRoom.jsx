@@ -323,6 +323,7 @@ export default function MeetingRoom({
   const [chatOpen, setChatOpen] = useState(
     () => initialSession.chatOpen ?? window.innerWidth > 1050,
   );
+  const [unreadMessageCount, setUnreadMessageCount] = useState(0);
   const [tab, setTab] = useState(initialSession.tab || "chat");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [elapsed, setElapsed] = useState(0);
@@ -332,11 +333,35 @@ export default function MeetingRoom({
   const attemptedCode = useRef("");
   const creating = useRef(false);
   const copyTimer = useRef(null);
+  const seenMessageIds = useRef(new Set());
+  const messageRoomId = useRef(null);
   const joinedAt = useRef(0);
   const minimizedVideoRef = useRef(null);
   const recorderSessionRef = useRef(null);
   const recordingUrlRef = useRef(null);
   const savedRoomCode = useRef(initialSession.roomCode || "");
+  useEffect(() => {
+    const currentRoomId = group.room?.selfId || null;
+    const currentIds = new Set(group.messages.map((message) => message.id));
+
+    if (messageRoomId.current !== currentRoomId) {
+      messageRoomId.current = currentRoomId;
+      seenMessageIds.current = currentIds;
+      setUnreadMessageCount(0);
+      return;
+    }
+
+    const newIncomingCount = group.messages.filter(
+      (message) =>
+        !seenMessageIds.current.has(message.id) &&
+        message.senderId !== currentRoomId,
+    ).length;
+    seenMessageIds.current = currentIds;
+
+    if (chatOpen && tab === "chat") setUnreadMessageCount(0);
+    else if (newIncomingCount > 0)
+      setUnreadMessageCount((count) => count + newIncomingCount);
+  }, [group.messages, group.room?.selfId, chatOpen, tab]);
   function connectRecordingAudio(session, streams) {
     for (const stream of streams) {
       for (const track of stream?.getAudioTracks?.() || []) {
@@ -1076,13 +1101,20 @@ export default function MeetingRoom({
                   title="Chat"
                   aria-label="Chat"
                   onClick={() => {
+                    const wasViewingChat = chatOpen && tab === "chat";
                     setTab("chat");
-                    setChatOpen(!chatOpen);
+                    if (wasViewingChat) setChatOpen(false);
+                    else {
+                      setUnreadMessageCount(0);
+                      setChatOpen(true);
+                    }
                   }}
                 >
                   <MessageSquare size={18} />
-                  {group.messages.length > 0 && (
-                    <span className="chat-count">{group.messages.length}</span>
+                  {unreadMessageCount > 0 && (
+                    <span className="chat-count" aria-label={`${unreadMessageCount} unread messages`}>
+                      {unreadMessageCount > 99 ? "99+" : unreadMessageCount}
+                    </span>
                   )}
                 </button>
               </div>
