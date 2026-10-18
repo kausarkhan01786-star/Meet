@@ -268,6 +268,7 @@ export function useGroup({ meetingType = "group" } = {}) {
               if (coordinates && locationCaptureRef.current === locationCapture && roomRef.current?.selfId === message.selfId) send({ type: "group-location", ...coordinates });
             });
             permissionsRef.current = message.self?.permissions || { microphone: true, camera: true, screen: true };
+            await applyPermissions(message.self);
             setMembers(message.members);
             setJoining(false);
             publishMedia();
@@ -288,7 +289,7 @@ export function useGroup({ meetingType = "group" } = {}) {
           } else if (message.type === "group-state" && roomRef.current) {
             const own = message.members.find((member) => member.id === roomRef.current.selfId);
             if (!own) return;
-            roomRef.current = { ...roomRef.current, ownerId: message.ownerId, chatEnabled: message.chatEnabled, recordingAllowed: message.recordingAllowed === true, self: own };
+            roomRef.current = { ...roomRef.current, ownerId: message.ownerId, chatEnabled: message.chatEnabled, muteAllLocked: message.muteAllLocked === true, recordingAllowed: message.recordingAllowed === true, self: own };
             setRoom(roomRef.current);
             setSelf(own);
             setAdmissionRequests(message.admissionRequests || []);

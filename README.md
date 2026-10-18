@@ -1,6 +1,6 @@
 # Meeting
 
-A browser meeting app with an interactive Three.js Earth hero, animated meeting choices, two-way voice and camera video, simultaneous screen sharing, and in-room chat. Single meetings support two people; groups support six. Different networks require public HTTPS hosting and a working TURN relay. This checkout is not automatically a publicly reachable website. The home copyright credit highlights the creator, **Kausar mia**.
+A browser meeting app with an interactive Three.js Earth hero, animated meeting choices, two-way voice and camera video, simultaneous screen sharing, and in-room chat. Single meetings support two people; group rooms accept up to 1,000 members. This is only a server admission limit: group calls still use a full mesh of browser WebRTC connections and are not suitable for 1,000 active media participants without an SFU. Different networks require public HTTPS hosting and a working TURN relay. This checkout is not automatically a publicly reachable website. The home copyright credit highlights the creator, **Kausar mia**.
 
 ## Run
 
@@ -29,7 +29,7 @@ The hero contains **Add Meeting**, which reveals **Single meeting** and **Group 
 5. **Stop sharing** ends only your screen, not the voice call. Clicking **Meeting home** or the active meeting header returns to the hero while keeping the call, microphone, screen sharing, chat, and peer connections mounted. A corner call dock restores the same room and offers mic mute and an explicit end button. The hero's **Return to Meeting** button also restores it. Only one meeting is active at a time.
 6. **Leave meeting**, **End minimized meeting**, closing/reloading the tab, or losing signaling releases your microphone/screen and peer connections. Home/minimize is not a hang-up action; native browser Back or navigating to another website is not supported as persistent background calling.
 
-Groups support **up to six members including the creator**, using a full mesh of browser WebRTC connections. Larger groups need an SFU media server, which this app does not implement. Each member uploads to every other member, so bandwidth and CPU use increase with group size, especially for simultaneous screens. Use headphones to reduce feedback.
+Groups admit **up to 1,000 members including the creator**, using the existing full mesh of browser WebRTC connections. This limit does not mean a 1,000-person call will work reliably: each member creates a separate connection to every other member, so browser CPU, memory, signaling traffic, and upload bandwidth grow rapidly with group size. Large meetings need an SFU media server, which this app does not implement. Use small groups for active audio/video until an SFU is integrated.
 
 A group code remains valid while at least one member stays connected. The creator leaving does not end the room for others; the last member leaving deletes it. Names are display labels, not verified identities. No moderator, member-kicking, recording, or account authentication is provided. If microphone permission is denied, you can still join and view; press **Unmute** after allowing permission to speak.
 
@@ -43,7 +43,7 @@ Groups and Single meetings share the same HTTPS/STUN/TURN infrastructure. **Loca
 - Camera capture requests 640x360 at 24fps, up to 30fps, with a front-facing camera preference. Actual quality adapts to the browser and connection. It requires HTTPS or desktop localhost. Phones can use their cameras even when mobile browser screen sharing is unavailable.
 - Denied/busy/missing cameras show a specific message without ending voice. Allow camera permission in browser settings and retry, or close another app that is using the webcam.
 - Minimizing to Home keeps camera capture active just like voice and screen sharing. Use Camera off or Leave/End to stop it. Leaving during a pending camera permission request also stops any camera stream returned afterward.
-- Reload both participants after deploying this camera update; older cached clients may not negotiate the additional camera video channel. Video increases upload and TURN relay bandwidth, especially in six-person groups.
+- Reload participants after deploying media updates; older cached clients may not negotiate the additional camera video channel. Video increases upload and TURN relay bandwidth as the group grows.
 
 Camera verification used generated video over real WebRTC, checked decoded remote camera pixels and simultaneous screen/camera streams, permission denial, off/on, minimized continuity, late Group joining and capture cleanup. Physical webcams, mobile camera hardware, and the public TURN deployment still require real-device testing.
 

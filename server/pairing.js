@@ -7,7 +7,7 @@ export function createPairingService({
   maxAttempts = 12,
   allowedOrigins = [],
   trustProxy = false,
-  maxGroupMembers = 6,
+  maxGroupMembers = 1000,
 } = {}) {
   const rooms = new Map();
   const groups = new Map();
@@ -29,7 +29,7 @@ export function createPairingService({
     handRaised: Boolean(socket.groupHandRaised),
     ...(includeLocation && socket.groupLocation ? { location: socket.groupLocation } : {}),
   });
-  const groupState = (group, viewer) => ({ type: "group-state", ownerId: group.ownerId, chatEnabled: group.chatEnabled, recordingAllowed: group.recordingAllowed === true, recordingParticipants: [...(group.recordingMembers?.values() || [])].map(({ id, name }) => ({ id, name })), members: [...group.members.values()].map((member) => memberInfo(member, ["owner", "admin"].includes(viewer?.groupRole))), admissionRequests: [...group.admissionRequests.values()].map(({ id, name, requestedAt }) => ({ id, name, requestedAt })) });
+  const groupState = (group, viewer) => ({ type: "group-state", ownerId: group.ownerId, chatEnabled: group.chatEnabled, muteAllLocked: group.muteAllLocked === true, recordingAllowed: group.recordingAllowed === true, recordingParticipants: [...(group.recordingMembers?.values() || [])].map(({ id, name }) => ({ id, name })), members: [...group.members.values()].map((member) => memberInfo(member, ["owner", "admin"].includes(viewer?.groupRole))), admissionRequests: [...group.admissionRequests.values()].map(({ id, name, requestedAt }) => ({ id, name, requestedAt })) });
   const clearFileUpload = (socket) => {
     if (!socket.groupFileUpload) return;
     clearTimeout(socket.groupFileUpload.timer);
@@ -211,6 +211,7 @@ export function createPairingService({
               meetingType,
               limit: meetingType === "single" ? 2 : maxGroupMembers,
               chatEnabled: true,
+              muteAllLocked: false,
               recordingAllowed: false,
               recordingMembers: new Map(),
               ownerId: null,
@@ -262,7 +263,8 @@ export function createPairingService({
           socket.memberName = memberName;
           socket.groupRole = message.type === "group-create" ? "owner" : "member";
           socket.groupPermissions = { microphone: true, camera: true, screen: true };
-          socket.groupMuteLocked = false;
+          socket.groupMuteLocked = group.muteAllLocked && message.type !== "group-create";
+          socket.groupMuted = socket.groupMuteLocked;
           socket.groupHandRaised = false;
           socket.groupClientId = clientId;
           socket.groupCode = code;
@@ -280,6 +282,7 @@ export function createPairingService({
             self: memberInfo(socket),
             ownerId: group.ownerId,
             chatEnabled: group.chatEnabled,
+            muteAllLocked: group.muteAllLocked === true,
             recordingAllowed: group.recordingAllowed === true,
             recordingParticipants: [...(group.recordingMembers?.values() || [])].map(({ id, name }) => ({ id, name })),
             admissionRequests: [...group.admissionRequests.values()].map(({ id, name, requestedAt }) => ({ id, name, requestedAt })),
@@ -317,6 +320,7 @@ export function createPairingService({
               group.recordingMembers.clear();
             }
           } else if (message.action === "mute-all") {
+            group.muteAllLocked = true;
             for (const member of group.members.values()) {
               if (member === socket || (socket.groupRole !== "owner" && ["owner", "admin"].includes(member.groupRole))) continue;
               member.groupMuteLocked = true;
@@ -324,6 +328,7 @@ export function createPairingService({
               send(member, { type: "group-force-mute", by: socket.memberName });
             }
           } else if (message.action === "unmute-all") {
+            group.muteAllLocked = false;
             for (const member of group.members.values()) member.groupMuteLocked = false;
           } else {
             const target = group.members.get(message.targetId);
@@ -339,7 +344,7 @@ export function createPairingService({
             } else if (message.action === "permission") {
               if (!["microphone", "camera", "screen"].includes(message.permission) || typeof message.allowed !== "boolean") return reject("Invalid member permission.");
               target.groupPermissions = { ...target.groupPermissions, [message.permission]: message.allowed };
-              if (message.permission === "microphone" && message.allowed) target.groupMuteLocked = false;
+              if (message.permission === "microphone" && message.allowed && !group.muteAllLocked) target.groupMuteLocked = false;
               if (!message.allowed) {
                 if (message.permission === "microphone") target.groupMuted = true;
                 if (message.permission === "camera") target.groupCamera = false;

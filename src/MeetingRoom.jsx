@@ -48,7 +48,7 @@ function ChatPanel({ group, tab, setTab, onClose, isRecording, startRecording, s
   const [draft, setDraft] = useState("");
   const chatDisabled = group.room?.chatEnabled === false;
   const cannotSend = !group.room || !group.online || chatDisabled;
-  const everyoneMicLocked = Boolean(group.self?.micLocked || group.members.some((member) => member.micLocked));
+  const everyoneMicLocked = Boolean(group.room?.muteAllLocked || group.self?.micLocked || group.members.some((member) => member.micLocked));
   const bottomRef = useRef(null);
   useEffect(() => {
     setDraft("");
@@ -1155,7 +1155,7 @@ export default function MeetingRoom({
                 <p>
                   {single
                     ? "Two-way voice, with up to two people."
-                    : "Multi-way voice, with up to six people."}{" "}
+                    : "Group capacity is up to 1,000 members. Large groups may overload browsers without an SFU."}{" "}
                   Screen sharing uses your browser's screen picker. Public HTTPS
                   and TURN are required for restricted networks.
                 </p>
