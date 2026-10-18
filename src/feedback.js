@@ -13,8 +13,10 @@ export const SOUND_CUES = {
     [1175, 0.06, 0.08],
   ],
   admission: [
-    [880, 0, 0.11],
-    [1175, 0.14, 0.16],
+    [659, 0, 0.24],
+    [784, 0.12, 0.24],
+    [988, 0.24, 0.28],
+    [1318, 0.39, 0.36],
   ],
 };
 
@@ -80,17 +82,13 @@ export function playFeedback(cue = "click") {
     if (now - (lastPlayed.get(cue) || 0) < (cue === "click" ? 45 : 300))
       return false;
     lastPlayed.set(cue, now);
-    for (const [frequency, offset, duration] of SOUND_CUES[cue]) {
+    const playTone = (frequency, start, duration, volume, type = "sine") => {
       const oscillator = audio.createOscillator();
       const gain = audio.createGain();
-      const start = audio.currentTime + offset;
-      oscillator.type = "sine";
+      oscillator.type = type;
       oscillator.frequency.setValueAtTime(frequency, start);
       gain.gain.setValueAtTime(0.0001, start);
-      gain.gain.exponentialRampToValueAtTime(
-        cue === "click" ? 0.025 : 0.045,
-        start + 0.008,
-      );
+      gain.gain.exponentialRampToValueAtTime(volume, start + 0.012);
       gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
       oscillator.connect(gain);
       gain.connect(audio.destination);
@@ -100,6 +98,13 @@ export function playFeedback(cue = "click") {
       };
       oscillator.start(start);
       oscillator.stop(start + duration + 0.01);
+    };
+    for (const [frequency, offset, duration] of SOUND_CUES[cue]) {
+      const start = audio.currentTime + offset;
+      const volume = cue === "click" ? 0.025 : cue === "admission" ? 0.032 : 0.045;
+      playTone(frequency, start, duration, volume, cue === "admission" ? "sine" : "sine");
+      if (cue === "admission")
+        playTone(frequency * 2, start, duration * 0.62, 0.006);
     }
     return true;
   } catch {
