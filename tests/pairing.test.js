@@ -1,9 +1,17 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
-import { once } from "node:events";
+import { once, on } from "node:events";
 import { WebSocket } from "ws";
 import { createPairingService } from "../server/pairing.js";
+import { parseChatContent } from "../shared/meeting-content.js";
+
+test("chat validates text and uploaded file attachments", () => {
+  assert.equal(parseChatContent({ text: "Hello \u{1F44B}" }).kind, "text");
+  assert.deepEqual(parseChatContent({ kind: "file", fileName: "notes.txt", mimeType: "text/plain", data: "data:text/plain;base64,aGVsbG8=" }), { kind: "file", fileName: "notes.txt", mimeType: "text/plain", data: "data:text/plain;base64,aGVsbG8=" });
+  assert.throws(() => parseChatContent({ kind: "sticker", stickerId: "great" }), /Unsupported/);
+  assert.throws(() => parseChatContent({ kind: "file", fileName: "bad.bin", mimeType: "application/octet-stream", data: "javascript:alert(1)" }), /file/i);
+});
 
 async function setup(context, options) {
   const service = createPairingService(options);
@@ -21,14 +29,17 @@ async function setup(context, options) {
       `ws://127.0.0.1:${server.address().port}/signal`,
       options,
     );
+    socket.testInbox = on(socket, "message", { close: ["close"] });
     await once(socket, "open");
     return socket;
   }
   const receive = async (socket) => {
-    const [data] = await once(socket, "message", {
-      signal: AbortSignal.timeout(2000),
-    });
-    return JSON.parse(data.toString());
+    let timer;
+    try {
+      const result = await Promise.race([socket.testInbox.next(), new Promise((resolve, reject) => { timer = setTimeout(() => reject(new Error("Timed out waiting for a signaling message")), 2000); })]);
+      if (result.done) throw new Error("Socket closed while awaiting a signaling message");
+      return JSON.parse(result.value[0].toString());
+    } finally { clearTimeout(timer); }
   };
   const send = (socket, message) => socket.send(JSON.stringify(message));
   return { client, receive, send };
@@ -166,6 +177,10 @@ test("groups admit multiple members, relay targeted messages and survive creator
       muted: true,
       sharing: false,
       camera: false,
+      role: "owner",
+      permissions: { microphone: true, camera: true, screen: true },
+      micLocked: false,
+      handRaised: false,
     },
   ]);
   await creatorNotice;
@@ -183,6 +198,10 @@ test("groups admit multiple members, relay targeted messages and survive creator
     muted: false,
     sharing: true,
     camera: true,
+    role: "member",
+    permissions: { microphone: true, camera: true, screen: true },
+    micLocked: false,
+    handRaised: false,
   });
   assert.deepEqual(await thirdMedia, {
     type: "group-member-media",
@@ -191,6 +210,9 @@ test("groups admit multiple members, relay targeted messages and survive creator
     muted: false,
     sharing: true,
     camera: true,
+    role: "member",
+    permissions: { microphone: true, camera: true, screen: true },
+    handRaised: false,
   });
   await creatorMedia;
   send(second, {
@@ -211,6 +233,8 @@ test("groups admit multiple members, relay targeted messages and survive creator
   creator.terminate();
   assert.equal((await secondLeft).id, created.selfId);
   await thirdLeft;
+  await receive(second);
+  await receive(third);
   send(second, {
     type: "group-signal",
     to: thirdJoined.selfId,
@@ -221,6 +245,7 @@ test("groups admit multiple members, relay targeted messages and survive creator
   const thirdSawLeave = receive(third);
   send(second, { type: "leave" });
   await thirdSawLeave;
+  await receive(third);
   send(third, { type: "leave" });
   send(third, { type: "group-join", code: created.code, name: "Third" });
   assert.match((await receive(third)).message, /not found/);
@@ -337,9 +362,18 @@ test("meeting chat uses trusted sender identity, stays room-scoped and limits me
   assert.equal(message.senderId, joined.selfId);
   assert.equal(typeof message.sentAt, "number");
   assert.equal((await echo).id, message.id);
+  const hostFileDelivery = [receive(host), receive(host), receive(host)];
+  const memberFileDelivery = [receive(member), receive(member), receive(member)];
+  send(member, { type: "group-chat", kind: "file", fileName: "hello.txt", mimeType: "text/plain", data: "data:text/plain;base64,aGVsbG8=" });
+  const [hostStart, hostChunk, hostEnd] = await Promise.all(hostFileDelivery);
+  await Promise.all(memberFileDelivery);
+  assert.equal(hostStart.type, "group-file-delivery-start");
+  assert.equal(hostStart.fileName, "hello.txt");
+  assert.equal(hostChunk.data, "aGVsbG8=");
+  assert.equal(hostEnd.type, "group-file-delivery-end");
   send(member, { type: "group-chat", text: "x".repeat(2001) });
   assert.match((await receive(member)).message, /2000/);
-  for (let index = 1; index < 20; index++) {
+  for (let index = 2; index < 20; index++) {
     const delivered = receive(host);
     send(member, { type: "group-chat", text: `Message ${index}` });
     await receive(member);
@@ -365,4 +399,57 @@ test("meeting create and join require a nonblank name and trim accepted names", 
   send(guest, { type: "group-join", code, name: "  Kausar mia  " });
   assert.equal((await receive(guest)).type, "group-joined");
   assert.equal((await noticed).member.name, "Kausar mia");
+});
+
+test("only authorized admins can manage chat, permissions, roles and removal", async (context) => {
+  const { client, receive, send } = await setup(context);
+  const owner = await client();
+  const admin = await client();
+  const member = await client();
+  send(owner, { type: "group-create", name: "Owner" });
+  const created = await receive(owner);
+  assert.equal(created.self.role, "owner");
+  assert.equal(created.self.handRaised, false);
+  send(admin, { type: "group-join", code: created.code, name: "Admin" });
+  const adminJoined = await receive(admin);
+  await receive(owner);
+  send(member, { type: "group-join", code: created.code, name: "Member" });
+  const memberJoined = await receive(member);
+  await receive(owner);
+  await receive(admin);
+  const allState = async () => Promise.all([owner, admin, member].map(receive));
+  send(member, { type: "group-admin", action: "chat", enabled: false });
+  assert.match((await receive(member)).message, /Only meeting admins/);
+  send(owner, { type: "group-admin", action: "role", targetId: adminJoined.selfId, role: "admin" });
+  assert.equal((await allState())[1].members.find((entry) => entry.id === adminJoined.selfId).role, "admin");
+  send(admin, { type: "group-admin", action: "remove", targetId: created.selfId });
+  assert.match((await receive(admin)).message, /higher or equal role/);
+  send(admin, { type: "group-admin", action: "chat", enabled: false });
+  assert.ok((await allState()).every((state) => state.chatEnabled === false));
+  send(member, { type: "group-chat", text: "Blocked message" });
+  assert.match((await receive(member)).message, /Chat is disabled/);
+  send(admin, { type: "group-admin", action: "permission", targetId: memberJoined.selfId, permission: "microphone", allowed: false });
+  assert.ok((await allState()).every((state) => state.members.find((entry) => entry.id === memberJoined.selfId).permissions.microphone === false));
+  send(member, { type: "group-media", muted: false, sharing: false, camera: false });
+  assert.equal((await receive(owner)).muted, true);
+  await receive(admin);
+  send(member, { type: "group-hand", raised: true });
+  assert.ok((await allState()).every((state) => state.members.find((entry) => entry.id === memberJoined.selfId).handRaised));
+  send(member, { type: "group-hand", raised: false });
+  assert.ok((await allState()).every((state) => !state.members.find((entry) => entry.id === memberJoined.selfId).handRaised));
+  send(admin, { type: "group-admin", action: "mute-all" });
+  assert.equal((await receive(member)).type, "group-force-mute");
+  const mutedState = await allState();
+  assert.ok(mutedState.every((state) => state.members.find((entry) => entry.id === memberJoined.selfId).micLocked));
+  send(owner, { type: "group-admin", action: "unmute-all" });
+  const unlockedState = await allState();
+  assert.ok(unlockedState.every((state) => !state.members.find((entry) => entry.id === memberJoined.selfId).micLocked));
+  send(admin, { type: "group-admin", action: "remove", targetId: memberJoined.selfId });
+  assert.equal((await receive(member)).type, "group-removed");
+  assert.equal((await receive(owner)).type, "group-member-left");
+  await receive(owner);
+  await receive(admin);
+  await receive(admin);
+  send(member, { type: "group-create", name: "New meeting" });
+  assert.equal((await receive(member)).type, "group-joined");
 });

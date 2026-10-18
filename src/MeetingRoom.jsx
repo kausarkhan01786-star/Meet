@@ -5,8 +5,11 @@ import {
   AudioLines,
   Check,
   ChevronDown,
+  Circle,
   Copy,
+  Download,
   Headphones,
+  Hand,
   LoaderCircle,
   LockKeyhole,
   LogIn,
@@ -21,6 +24,7 @@ import {
   Send,
   Settings2,
   ShieldCheck,
+  Square,
   Users,
   Volume2,
   VolumeX,
@@ -37,9 +41,14 @@ import {
   useAudioActivity,
 } from "./MediaViews";
 import { saveMeetingSession } from "./meetingSession.js";
+import { saveMeetingRecording } from "./meetingRecording.js";
+import { ChatAttachments, MemberActions, MemberLocation, MeetingReactions, ReactionControls, RichMessage, RoleBadge } from "./MeetingTools";
 
-function ChatPanel({ group, tab, setTab, onClose }) {
+function ChatPanel({ group, tab, setTab, onClose, isRecording, startRecording, stopRecording, recordingMessage, savedRecording }) {
   const [draft, setDraft] = useState("");
+  const chatDisabled = group.room?.chatEnabled === false;
+  const cannotSend = !group.room || !group.online || chatDisabled;
+  const everyoneMicLocked = Boolean(group.self?.micLocked || group.members.some((member) => member.micLocked));
   const bottomRef = useRef(null);
   useEffect(() => {
     setDraft("");
@@ -60,15 +69,27 @@ function ChatPanel({ group, tab, setTab, onClose }) {
             aria-selected={tab === "chat"}
             onClick={() => setTab("chat")}
           >
-            <MessageSquare size={16} /> Chat
+            <MessageSquare size={13} /> Chat
           </button>
           <button
             role="tab"
             aria-selected={tab === "people"}
             onClick={() => setTab("people")}
           >
-            <Users size={16} /> People{" "}
+            <Users size={13} /> People{" "}
             <span>{group.room ? group.members.length + 1 : 0}</span>
+          </button>
+          {group.isAdmin && <button
+            role="tab"
+            aria-selected={tab === "permissions"}
+            onClick={() => setTab("permissions")}
+          >
+            <ShieldCheck size={13} /> Permission{" "}
+            {group.admissionRequests.length > 0 && <span className="admission-count" aria-label={`${group.admissionRequests.length} pending rejoin requests`}>{group.admissionRequests.length}</span>}
+          </button>}
+          <button role="tab" aria-selected={tab === "others"} onClick={() => setTab("others")}>
+            <MoreHorizontal size={13} /> Others
+            {group.recordingParticipants.length > 0 && <span className="recording-count" aria-label={`${group.recordingParticipants.length} active recordings`}>{group.recordingParticipants.length}</span>}
           </button>
         </div>
         <button
@@ -80,6 +101,8 @@ function ChatPanel({ group, tab, setTab, onClose }) {
           <X size={18} />
         </button>
       </div>
+      {group.isAdmin && <div className="meeting-admin-bar"><label><span><ShieldCheck size={13} /> Meeting chat</span><input type="checkbox" aria-label="Enable meeting chat" checked={group.room?.chatEnabled !== false} onChange={(event) => group.adminAction("chat", { enabled: event.target.checked })} /></label>{tab === "people" && <button title={everyoneMicLocked ? "Allow everyone to unmute their microphone" : "Mute everyone and prevent self-unmute"} onClick={() => group.adminAction(everyoneMicLocked ? "unmute-all" : "mute-all")}>{everyoneMicLocked ? <Mic size={14} /> : <MicOff size={14} />}{everyoneMicLocked ? "Allow unmute" : "Mute everyone"}</button>}</div>}
+      {tab === "chat" && chatDisabled && <div className="chat-disabled-note" role="status"><LockKeyhole size={12} /> Chat is disabled by an admin.</div>}
       {tab === "chat" ? (
         <>
           <div
@@ -119,7 +142,7 @@ function ChatPanel({ group, tab, setTab, onClose }) {
                     })}
                   </time>
                 </div>
-                <p>{message.text}</p>
+                <RichMessage message={message} />
               </article>
             ))}
             <div ref={bottomRef} />
@@ -133,7 +156,7 @@ function ChatPanel({ group, tab, setTab, onClose }) {
               placeholder="Send a message..."
               rows={2}
               maxLength={2000}
-              disabled={!group.room || !group.online}
+              disabled={cannotSend}
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
               onKeyDown={(event) => {
@@ -147,6 +170,7 @@ function ChatPanel({ group, tab, setTab, onClose }) {
                 }
               }}
             />
+            <ChatAttachments disabled={cannotSend} onEmoji={(emoji) => setDraft((current) => (current + emoji).slice(0, 2000))} onSendFile={group.sendFile} />
             <div>
               <span>
                 <LockKeyhole size={11} /> Only in this meeting
@@ -155,14 +179,14 @@ function ChatPanel({ group, tab, setTab, onClose }) {
                 type="submit"
                 aria-label="Send message"
                 title="Send message"
-                disabled={!group.room || !group.online || !draft.trim()}
+                disabled={cannotSend || !draft.trim()}
               >
                 <Send size={15} />
               </button>
             </div>
           </form>
         </>
-      ) : (
+      ) : tab === "people" ? (
         <div className="people-list">
           {!group.room ? (
             <div className="chat-empty">
@@ -174,11 +198,12 @@ function ChatPanel({ group, tab, setTab, onClose }) {
               <div className="person-row">
                 <span className="person-avatar">YOU</span>
                 <div>
-                  <strong>You</strong>
+                  <strong>You <RoleBadge role={group.self?.role} /></strong>
                   <small>
                     {group.muted ? "Microphone off" : "Microphone on"}
                   </small>
                 </div>
+                {group.self?.handRaised && <Hand size={15} className="raised-hand-icon" aria-label="Your hand is raised" />}
                 {group.muted ? <MicOff size={15} /> : <Mic size={15} />}
               </div>
               {group.members.map((member) => (
@@ -187,7 +212,7 @@ function ChatPanel({ group, tab, setTab, onClose }) {
                     {member.name.slice(0, 2).toUpperCase()}
                   </span>
                   <div>
-                    <strong>{member.name}</strong>
+                    <strong>{member.name} <RoleBadge role={member.role} /></strong>
                     <small>
                       {group.connections[member.id] === "connected"
                         ? member.sharing
@@ -198,11 +223,33 @@ function ChatPanel({ group, tab, setTab, onClose }) {
                         : "Connecting..."}
                     </small>
                   </div>
+                  {member.handRaised && <Hand size={15} className="raised-hand-icon" aria-label={`${member.name}'s hand is raised`} />}
                   {member.muted ? <MicOff size={15} /> : <Mic size={15} />}
+                  <MemberActions group={group} member={member} />
+                  {group.isAdmin && <MemberLocation member={member} />}
                 </div>
               ))}
             </>
           )}
+        </div>
+      ) : tab === "permissions" ? (
+        <div className="admission-requests-list" aria-live="assertive">
+          <div className="admission-banner-heading"><strong>Rejoin requests</strong><span>{group.admissionRequests.length} waiting</span></div>
+          {group.admissionRequests.length ? group.admissionRequests.map((request) => <div className="admission-request-row" key={request.id}><span><strong>{request.name}</strong><small>Wants to rejoin this meeting</small></span><button className="admission-accept" onClick={() => group.decideAdmission(request.id, true)}><Check size={14} /> Accept</button><button className="admission-reject" onClick={() => group.decideAdmission(request.id, false)}><X size={14} /> Reject</button></div>) : <p className="admission-requests-empty">No rejoin requests right now.</p>}
+        </div>
+      ) : (
+        <div className="others-panel">
+          <h3>Meeting recording</h3>
+          <p>Record the meeting screen and audio, then save the video on this device.</p>
+          {group.self?.role === "owner" && <label className="recording-permission-setting"><span><strong>Allow meeting recording</strong><small>Anyone in this meeting can record and save a local copy.</small></span><input type="checkbox" checked={group.room?.recordingAllowed === true} onChange={(event) => group.adminAction("recording-permission", { enabled: event.target.checked })} /></label>}
+          {group.recordingParticipants.length > 0 && <div className="recording-live-status"><i /> Recording: {group.recordingParticipants.map((participant) => participant.id === group.room?.selfId ? "You" : participant.name).join(", ")}</div>}
+          <button className={`stage-record-button ${isRecording ? "is-recording" : ""}`} disabled={!group.room?.recordingAllowed && !isRecording} title={!group.room?.recordingAllowed && !isRecording ? "The owner has disabled recording" : isRecording ? "Stop and save the recording" : "Record this meeting to this device"} onClick={isRecording ? stopRecording : startRecording}>
+            {isRecording ? <Square size={14} /> : <Circle size={14} />}
+            {isRecording ? "Stop & save" : "Record meeting"}
+          </button>
+          <small className="recording-help">Choose the meeting tab or screen in your browser’s sharing prompt.</small>
+          {recordingMessage && <span className="recording-message" role="status">{recordingMessage}</span>}
+          {savedRecording && <a className="recording-download" href={savedRecording.url} download={savedRecording.name}><Download size={13} /> Download recording</a>}
         </div>
       )}
     </aside>
@@ -217,6 +264,7 @@ function VoiceParticipant({
   muted,
   stream,
   connected,
+  handRaised = false,
 }) {
   const speaking = useAudioActivity(stream, !muted);
   const status = muted
@@ -242,6 +290,7 @@ function VoiceParticipant({
       </div>
       <strong>
         {name}
+        {handRaised && <Hand size={14} className="raised-hand-icon" aria-label="Hand raised" />}
         {muted && <MicOff size={12} />}
         {local && !muted && <Mic size={12} />}
       </strong>
@@ -277,12 +326,112 @@ export default function MeetingRoom({
   const [tab, setTab] = useState(initialSession.tab || "chat");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [elapsed, setElapsed] = useState(0);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingMessage, setRecordingMessage] = useState("");
+  const [savedRecording, setSavedRecording] = useState(null);
   const attemptedCode = useRef("");
   const creating = useRef(false);
   const copyTimer = useRef(null);
   const joinedAt = useRef(0);
   const minimizedVideoRef = useRef(null);
+  const recorderSessionRef = useRef(null);
+  const recordingUrlRef = useRef(null);
   const savedRoomCode = useRef(initialSession.roomCode || "");
+  function connectRecordingAudio(session, streams) {
+    for (const stream of streams) {
+      for (const track of stream?.getAudioTracks?.() || []) {
+        if (track.readyState !== "live" || session.trackIds.has(track.id)) continue;
+        const source = session.audioContext.createMediaStreamSource(new MediaStream([track]));
+        source.connect(session.audioDestination);
+        session.trackIds.add(track.id);
+        session.sources.push(source);
+      }
+    }
+  }
+  async function startRecording() {
+    if (!group.room?.recordingAllowed || recorderSessionRef.current) return;
+    if (!navigator.mediaDevices?.getDisplayMedia || !window.MediaRecorder) {
+      setRecordingMessage("This browser cannot record the meeting screen.");
+      return;
+    }
+    let displayStream;
+    let audioContext;
+    try {
+      displayStream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: { ideal: 30, max: 30 } }, audio: false });
+      if (!displayStream.getVideoTracks().length) throw new Error("Choose a screen or meeting tab to record.");
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContextClass) throw new Error("This browser cannot mix meeting audio for recording.");
+      audioContext = new AudioContextClass();
+      await audioContext.resume();
+      const audioDestination = audioContext.createMediaStreamDestination();
+      const session = { displayStream, audioContext, audioDestination, trackIds: new Set(), sources: [], chunks: [], stopping: false };
+      connectRecordingAudio(session, [group.localAudio, ...Object.values(group.streams)]);
+      const recordedStream = new MediaStream([...displayStream.getVideoTracks(), ...audioDestination.stream.getAudioTracks()]);
+      const mimeType = ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"].find((type) => MediaRecorder.isTypeSupported(type));
+      const recorder = new MediaRecorder(recordedStream, { ...(mimeType ? { mimeType } : {}), videoBitsPerSecond: 2_500_000, audioBitsPerSecond: 128_000 });
+      session.recorder = recorder;
+      session.finish = async () => {
+        if (session.finished) return;
+        session.finished = true;
+        recorderSessionRef.current = null;
+        displayStream.getTracks().forEach((track) => { track.onended = null; track.stop(); });
+        try { await audioContext.close(); } catch {}
+        group.reportRecording(false);
+        setIsRecording(false);
+        if (!session.chunks.length) {
+          setRecordingMessage("No recording data was captured.");
+          return;
+        }
+        const blob = new Blob(session.chunks, { type: recorder.mimeType || "video/webm" });
+        const filename = `meeting-${group.room?.code || "recording"}-${new Date().toISOString().replace(/[:.]/g, "-")}.webm`;
+        try {
+          await saveMeetingRecording({ id: globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`, name: filename, meetingCode: group.room?.code || "", createdAt: Date.now(), blob });
+          if (recordingUrlRef.current) URL.revokeObjectURL(recordingUrlRef.current);
+          recordingUrlRef.current = URL.createObjectURL(blob);
+          setSavedRecording({ name: filename, url: recordingUrlRef.current });
+          setRecordingMessage("Recording saved on this device.");
+        } catch (failure) {
+          setRecordingMessage(failure.message || "Could not save the recording on this device.");
+        }
+      };
+      recorder.ondataavailable = (event) => { if (event.data.size) session.chunks.push(event.data); };
+      recorder.onstop = () => { void session.finish(); };
+      recorder.onerror = () => { setRecordingMessage("Recording stopped because the browser reported an error."); stopRecording(); };
+      displayStream.getVideoTracks()[0].onended = () => stopRecording();
+      recorderSessionRef.current = session;
+      recorder.start(1000);
+      setRecordingMessage("");
+      setIsRecording(true);
+      setSavedRecording(null);
+      group.reportRecording(true);
+    } catch (failure) {
+      recorderSessionRef.current = null;
+      displayStream?.getTracks().forEach((track) => track.stop());
+      try { await audioContext?.close(); } catch {}
+      setRecordingMessage(failure.name === "NotAllowedError" ? "Screen sharing was cancelled." : failure.message || "Could not start the recording.");
+    }
+  }
+  function stopRecording() {
+    const session = recorderSessionRef.current;
+    if (!session || session.stopping) return;
+    session.stopping = true;
+    if (session.recorder.state === "inactive") void session.finish();
+    else session.recorder.stop();
+  }
+  useEffect(() => {
+    const session = recorderSessionRef.current;
+    if (session) connectRecordingAudio(session, [group.localAudio, ...Object.values(group.streams)]);
+  }, [group.localAudio, group.streams]);
+  useEffect(() => {
+    if (recorderSessionRef.current && (!group.room?.recordingAllowed || group.recordingStopSignal)) stopRecording();
+  }, [group.room?.recordingAllowed, group.recordingStopSignal, group.room?.selfId]);
+  useEffect(() => () => {
+    const session = recorderSessionRef.current;
+    if (session?.recorder.state === "recording") session.recorder.stop();
+    session?.displayStream.getTracks().forEach((track) => track.stop());
+    try { session?.audioContext.close(); } catch {}
+    if (recordingUrlRef.current) URL.revokeObjectURL(recordingUrlRef.current);
+  }, []);
   useEffect(() => {
     saveMeetingSession({
       mode,
@@ -356,7 +505,7 @@ export default function MeetingRoom({
       1000,
     );
     return () => clearInterval(timer);
-  }, [group.room]);
+  }, [group.room?.selfId]);
   useEffect(() => () => clearTimeout(copyTimer.current), []);
   async function copyCode() {
     try {
@@ -433,6 +582,7 @@ export default function MeetingRoom({
         className={`meeting-workspace ${chatOpen ? "has-sidebar" : ""} ${group.room ? "is-in-call" : ""}`}
         hidden={minimized}
       >
+        <MeetingReactions reactions={group.reactions} />
         <header className="meeting-header">
           <button
             className="workspace-brand"
@@ -663,10 +813,13 @@ export default function MeetingRoom({
                       <LogIn size={31} strokeWidth={1.2} />
                     </div>
                     <h2>
-                      {single
+                      {group.admissionStatus === "pending"
+                        ? "Waiting for rejoin approval."
+                        : single
                         ? "You're six digits away."
                         : "Join your meeting."}
                     </h2>
+                    {group.admissionStatus === "pending" && <p className="admission-waiting-note" role="status">The Owner or an Admin will review your request. Please keep this page open.</p>}
                     <label htmlFor="join-display-name">
                       YOUR NAME <span>REQUIRED</span>
                     </label>
@@ -679,7 +832,7 @@ export default function MeetingRoom({
                       required
                       autoFocus
                       value={name}
-                      disabled={group.joining}
+                      disabled={group.joining || group.admissionStatus === "pending"}
                       onChange={(event) => setName(event.target.value)}
                     />
                     <label htmlFor="meeting-code">
@@ -693,7 +846,7 @@ export default function MeetingRoom({
                       pattern="[0-9]{6}"
                       placeholder="000000"
                       value={code}
-                      disabled={group.joining}
+                      disabled={group.joining || group.admissionStatus === "pending"}
                       required
                       onChange={(event) => {
                         setAutoEnter(true);
@@ -702,11 +855,13 @@ export default function MeetingRoom({
                         );
                       }}
                     />
+                    <p className="location-sharing-note">Your browser will ask to share your location. Meeting admins can view it on a map.</p>
                     <button
                       className="connect-call-button"
                       disabled={
                         !group.online ||
                         group.joining ||
+                        group.admissionStatus === "pending" ||
                         !name.trim() ||
                         code.length !== 6
                       }
@@ -716,7 +871,7 @@ export default function MeetingRoom({
                       ) : (
                         <ArrowRight size={16} />
                       )}
-                      {group.joining ? "Connecting..." : "Connect"}
+                      {group.joining ? "Connecting..." : group.admissionStatus === "pending" ? "Waiting for approval" : "Connect"}
                     </button>
                     <span className="join-secure">
                       <LockKeyhole size={12} /> The code stays between your
@@ -750,6 +905,7 @@ export default function MeetingRoom({
                       disabled={group.joining}
                       onChange={(event) => setName(event.target.value)}
                     />
+                    <p className="location-sharing-note">Your browser will ask to share your location. Meeting admins can view it on a map.</p>
                     <button
                       className="connect-call-button"
                       disabled={
@@ -810,6 +966,7 @@ export default function MeetingRoom({
                         avatarName={name.trim() || "You"}
                         local
                         muted={group.muted}
+                        handRaised={group.self?.handRaised}
                         stream={group.localAudio}
                       />
                       {group.members.map((member, index) => (
@@ -818,6 +975,7 @@ export default function MeetingRoom({
                           name={member.name}
                           tone={index % 3}
                           muted={member.muted}
+                          handRaised={member.handRaised}
                           stream={group.streams[member.id]}
                           connected={
                             group.connections[member.id] === "connected"
@@ -887,13 +1045,14 @@ export default function MeetingRoom({
                 )}
               </div>
               <div className="call-controls">
+                <ReactionControls group={group} />
                 <button
                   className={`call-control camera-control ${group.cameraOn ? "camera-is-on" : "control-off"}`}
                   aria-label={
                     group.cameraOn ? "Turn camera off" : "Turn camera on"
                   }
                   title={group.cameraOn ? "Turn camera off" : "Turn camera on"}
-                  disabled={!group.room || group.mediaBusy}
+                  disabled={!group.room || group.mediaBusy || group.self?.permissions?.camera === false}
                   onClick={group.toggleCamera}
                 >
                   {group.cameraOn ? (
@@ -905,10 +1064,10 @@ export default function MeetingRoom({
                 <button
                   className={`call-control ${group.muted ? "control-off" : ""}`}
                   aria-label={
-                    group.muted ? "Unmute microphone" : "Mute microphone"
+                    group.self?.micLocked ? "Microphone locked by meeting owner" : group.muted ? "Unmute microphone" : "Mute microphone"
                   }
-                  title={group.muted ? "Unmute microphone" : "Mute microphone"}
-                  disabled={!group.room || group.mediaBusy}
+                  title={group.self?.micLocked ? "The owner must allow unmuting" : group.muted ? "Unmute microphone" : "Mute microphone"}
+                  disabled={!group.room || group.mediaBusy || group.self?.permissions?.microphone === false || group.self?.micLocked === true}
                   onClick={group.toggleMic}
                 >
                   {group.muted ? <MicOff size={20} /> : <Mic size={20} />}
@@ -1023,6 +1182,11 @@ export default function MeetingRoom({
                 tab={tab}
                 setTab={setTab}
                 onClose={() => setChatOpen(false)}
+                isRecording={isRecording}
+                startRecording={startRecording}
+                stopRecording={stopRecording}
+                recordingMessage={recordingMessage}
+                savedRecording={savedRecording}
               />
             </>
           )}
@@ -1082,14 +1246,16 @@ export default function MeetingRoom({
           <div className="minimized-call-controls">
             <button
               className="m-icon"
-              disabled={!group.room || group.mediaBusy}
+              disabled={!group.room || group.mediaBusy || group.self?.permissions?.microphone === false || group.self?.micLocked === true}
               onClick={group.toggleMic}
               aria-label={
-                group.muted
+                group.self?.micLocked
+                  ? "Microphone locked by meeting owner"
+                  : group.muted
                   ? "Unmute minimized microphone"
                   : "Mute minimized microphone"
               }
-              title={group.muted ? "Unmute microphone" : "Mute microphone"}
+              title={group.self?.micLocked ? "The owner must allow unmuting" : group.muted ? "Unmute microphone" : "Mute microphone"}
             >
               {group.muted ? <MicOff size={17} /> : <Mic size={17} />}
             </button>

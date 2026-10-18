@@ -686,6 +686,41 @@ button:active:not(:disabled) {
   background: #111117;
   flex-shrink: 0;
 }
+.admission-requests-list { flex: 1; min-height: 0; overflow-y: auto; padding: 14px 16px; }
+.admission-requests-empty { margin: 12px 0; color: #9889a4; font-size: 11px; }
+.admission-banner-heading { display: flex; align-items: center; gap: 9px; margin-bottom: 6px; color: #f1d6a4; font-size: 11px; }
+.admission-banner-heading span { padding: 2px 6px; border-radius: 10px; background: #4b3921; color: #f3d39a; font-size: 8px; }
+.admission-request-row { display: flex; align-items: center; gap: 7px; min-height: 38px; padding: 5px 0; border-top: 1px solid #ffffff0c; }
+.admission-request-row > span { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 2px; }
+.admission-request-row > span strong { overflow: hidden; color: #eee2d1; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.admission-request-row > span small { color: #ab9b87; font-size: 8px; }
+.admission-request-row button { display: flex; align-items: center; gap: 4px; padding: 6px 8px; border-radius: 4px; font-size: 9px; }
+.admission-accept { background: #344536; color: #d6ebd2; }
+.admission-reject { background: #4b3032; color: #f0c5c5; }
+.admission-waiting-note { margin: 5px 0 13px; color: #c8ad7a; font-size: 11px; line-height: 1.5; }
+.recording-permission-setting { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 12px 0 16px; padding: 11px 12px; border: 1px solid #493752; border-radius: 6px; background: #201a27; }
+.recording-permission-setting > span { display: flex; flex-direction: column; gap: 4px; }
+.recording-permission-setting strong { color: #e3d4eb; font-size: 13px; }
+.recording-permission-setting small { color: #a997b5; font-size: 11px; line-height: 1.45; }
+.recording-permission-setting input { flex: 0 0 auto; accent-color: #b994d2; }
+.others-panel { flex: 1; min-height: 0; overflow-y: auto; padding: 16px; }
+.others-panel > h3 { margin: 0 0 8px; color: #e4d7eb; font-size: 16px; }
+.others-panel > p { margin: 0 0 12px; color: #a997b5; font-size: 12px; line-height: 1.5; }
+.others-panel > .recording-live-status { margin: 4px 0 12px; }
+.others-panel > .stage-record-button { margin: 12px 0 6px; }
+.recording-help { display: block; margin: 4px 0 8px; color: #a392ad; font-size: 11px; line-height: 1.45; }
+.others-panel > .recording-message { display: block; margin: 6px 0; }
+.others-panel > .recording-download { width: fit-content; margin-top: 8px; }
+.stage-record-button, .recording-download { display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 8px 12px; border: 1px solid #564163; border-radius: 5px; color: #ddc9e9; background: #1c1722ed; font-size: 12px; text-decoration: none; }
+.stage-record-button:not(:disabled):hover, .recording-download:hover { background: #33263c; }
+.stage-record-button:disabled { color: #786b80; cursor: not-allowed; opacity: .8; }
+.stage-record-button > svg:first-child { color: #e66d7c; fill: #e66d7c; }
+.stage-record-button.is-recording { border-color: #a44452; color: #ffdce0; background: #3b1e28ed; }
+.stage-record-button.is-recording > svg:first-child { color: #ff566b; fill: #ff566b; }
+.recording-live-status { display: inline-flex; align-items: center; gap: 7px; padding: 7px 10px; border: 1px solid #713a43; border-radius: 5px; background: #28191fee; color: #f0b8bf; font-size: 11px; }
+.recording-live-status i { width: 7px; height: 7px; border-radius: 50%; background: #ff5367; box-shadow: 0 0 8px #ff5367; }
+.recording-message { max-width: 280px; padding: 6px 9px; border-radius: 4px; background: #17131edc; color: #d1c3d9; font-size: 11px; line-height: 1.4; }
+.location-sharing-note { margin: 8px 0; color: #a997b5; font-size: 10px; line-height: 1.45; }
 .workspace-brand {
   display: flex;
   align-items: center;
@@ -972,6 +1007,7 @@ button:active:not(:disabled) {
   border-color: #a1c6ac1a;
 }
 .meeting-stage {
+  position: relative;
   flex: 1;
   min-height: 330px;
   border: 1px solid #352c3e;
@@ -1273,20 +1309,29 @@ button:active:not(:disabled) {
   display: flex;
   align-items: center;
   border-bottom: 1px solid #ffffff08;
-  padding: 0 18px;
+  padding: 0 8px;
   flex-shrink: 0;
 }
 .sidebar-tabs {
   display: flex;
   align-items: center;
-  gap: 18px;
+  flex: 1 1 auto;
+  gap: 10px;
   height: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.sidebar-tabs::-webkit-scrollbar {
+  display: none;
 }
 .sidebar-tabs > button {
   display: flex;
+  flex: 0 0 auto;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   font-size: 11px;
+  white-space: nowrap;
   color: #7f6b8f;
   background: none;
   padding: 0;
@@ -1307,10 +1352,21 @@ button:active:not(:disabled) {
   border-radius: 3px;
   color: #a78ab9;
 }
+.sidebar-tabs > button > .admission-count { background: #593d2c; color: #f2c590; }
+.sidebar-tabs > button > .recording-count { background: #532b34; color: #f0aeb7; }
 .close-sidebar {
   margin-left: auto;
-  width: 25px;
+  flex: 0 0 22px;
+  width: 22px;
   height: 25px;
+}
+@media (max-width: 1200px) {
+  .sidebar-top { padding-right: 6px; padding-left: 6px; }
+  .sidebar-tabs { gap: 6px; }
+  .sidebar-tabs > button { gap: 3px; font-size: 9px; }
+  .sidebar-tabs > button svg { width: 12px; height: 12px; }
+  .sidebar-tabs > button > span { min-width: 13px; height: 13px; }
+  .close-sidebar { flex-basis: 20px; width: 20px; }
 }
 .chat-messages {
   flex: 1;
@@ -2788,3 +2844,189 @@ button:active:not(:disabled) {
     scroll-behavior: auto !important;
   }
 }
+
+/* Keep the call controls and meeting stage usable on short phone/tablet screens. */
+@media (max-width: 900px) and (max-height: 560px) {
+  .meeting-home {
+    min-height: 560px;
+  }
+  .meeting-home .hero-copy {
+    bottom: 86px;
+  }
+  .meeting-home .creator-credit {
+    bottom: 14px;
+  }
+  .meeting-home.has-minimized-call .hero-copy {
+    bottom: 165px;
+  }
+  .meeting-home.has-minimized-call .creator-credit {
+    bottom: 100px;
+  }
+  .is-in-call .meeting-header {
+    height: 92px;
+  }
+  .is-in-call .meeting-workspace-body {
+    height: calc(100dvh - 92px);
+  }
+  .is-in-call .meeting-sidebar {
+    top: 92px;
+  }
+  .is-in-call .sidebar-scrim {
+    top: 92px;
+  }
+  .is-in-call .meeting-main {
+    padding-top: 8px;
+  }
+  .is-in-call .meeting-stage,
+  .is-in-call .voice-room,
+  .is-in-call .meeting-join-stage {
+    min-height: 240px;
+  }
+  .is-in-call .voice-members {
+    gap: 24px;
+    padding-top: 20px;
+    margin-bottom: 12px;
+  }
+  .is-in-call .voice-avatar {
+    width: 64px;
+    height: 64px;
+  }
+  .is-in-call .call-bottom-bar {
+    min-height: 68px;
+    padding-top: 7px;
+    padding-bottom: max(7px, env(safe-area-inset-bottom));
+  }
+}
+
+@media (max-width: 360px) {
+  .is-in-call .meeting-header {
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+  .is-in-call .meeting-type-label {
+    max-width: 96px;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+  .is-in-call .header-room-title {
+    font-size: 13px;
+  }
+  .is-in-call .header-room-code {
+    padding-left: 7px;
+  }
+  .is-in-call .header-room-code strong {
+    font-size: 17px;
+  }
+  .is-in-call .meeting-main {
+    padding-right: 8px;
+    padding-left: 8px;
+  }
+  .is-in-call .call-controls {
+    gap: 3px;
+  }
+  .is-in-call .call-control {
+    min-width: 31px;
+    padding-right: 5px;
+    padding-left: 5px;
+  }
+  .is-in-call .call-control.hang-up {
+    min-width: 38px;
+  }
+  .is-in-call .controls-divider {
+    margin-right: 0;
+    margin-left: 0;
+  }
+}
+
+/* Meeting host tools, chat media and live reactions */
+.meeting-admin-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 16px;
+  border-bottom: 1px solid #ffffff0d;
+  background: #1c1722;
+}
+.meeting-admin-bar label,
+.meeting-admin-bar label span,
+.meeting-admin-bar > button {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #c5b3d1;
+  font-size: 10px;
+}
+.meeting-admin-bar input,
+.member-permissions input { accent-color: #b994d2; }
+.meeting-admin-bar > button {
+  padding: 6px 8px;
+  border: 1px solid #493752;
+  border-radius: 4px;
+  background: #281f30;
+}
+.chat-disabled-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 16px;
+  color: #c4b3cd;
+  background: #241d2a;
+  font-size: 10px;
+}
+.member-actions { position: relative; flex: 0 0 auto; }
+.member-location-trigger { display: grid; flex: 0 0 auto; place-items: center; width: 28px; height: 28px; color: #c2a5d2; border-radius: 4px; background: transparent; text-decoration: none; cursor: pointer; }
+.member-location-trigger:hover:not(:disabled) { background: #34263d; color: #ead8f5; }
+.member-location-trigger.is-unavailable, .member-location-trigger:disabled { color: #62566c; cursor: not-allowed; }
+.member-actions-trigger { display: grid; place-items: center; width: 28px; height: 28px; color: #c2a5d2; cursor: pointer; border-radius: 4px; background: transparent; }
+.member-actions-trigger[aria-expanded="true"], .member-actions-trigger:hover { background: #34263d; }
+.member-action-menu {
+  position: fixed;
+  z-index: 1000;
+  width: min(225px, calc(100vw - 16px));
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
+  padding: 9px;
+  border: 1px solid #493752;
+  border-radius: 7px;
+  background: #1b1720;
+  box-shadow: 0 12px 32px #0009;
+}
+.member-action-menu > strong { display: block; padding: 4px 6px 8px; color: #eee4f2; font-size: 11px; }
+.member-action-menu > button { width: 100%; display: flex; align-items: center; gap: 8px; padding: 8px 6px; border-radius: 4px; text-align: left; color: #cbbbd2; background: transparent; font-size: 10px; }
+.member-action-menu > button:hover { background: #302637; }
+.member-action-menu > .remove-member { color: #f0a5a5; }
+.member-permissions { padding: 5px 6px; border-top: 1px solid #ffffff10; border-bottom: 1px solid #ffffff10; }
+.member-permissions label { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 5px 0; color: #bfb2c6; font-size: 9px; }
+.role-badge { display: inline-flex; vertical-align: middle; align-items: center; gap: 3px; margin-left: 4px; padding: 2px 5px; border-radius: 8px; background: #382a42; color: #d9b9ec; font-size: 8px; font-weight: 600; }
+.role-owner { background: #403729; color: #ecd39c; }
+.raised-hand-icon { color: #f2ce75 !important; }
+.chat-attachments { position: relative; display: flex !important; justify-content: flex-start !important; margin-top: 8px !important; }
+.chat-attachment-buttons { display: flex; gap: 5px; }
+.chat-composer .m-icon { display: grid; place-items: center; width: 29px; height: 29px; border: 1px solid #493752; border-radius: 4px; background: #241c2a; color: #cbb3d8; }
+.chat-composer .m-icon.is-active { background: #3b2b46; color: #f1e0fb; }
+.chat-media-picker { position: absolute; z-index: 30; left: 0; bottom: 38px; width: min(270px, calc(100vw - 48px)); max-height: 300px; overflow: auto; padding: 10px; border: 1px solid #493752; border-radius: 7px; background: #1b1720; box-shadow: 0 12px 32px #0009; }
+.emoji-picker { width: 240px; }
+.chat-file-input { display: none; }
+.chat-file-feedback { display: flex; align-items: center; gap: 4px; margin-left: 6px; color: #b9a3c8; font-size: 9px; }
+.chat-file-feedback.has-error { color: #f0a5a5; }
+.media-picker-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; color: #e4d7eb; font-size: 11px; }
+.media-picker-heading .m-icon { border: 0; }
+.emoji-options { display: grid; grid-template-columns: repeat(6, 1fr); gap: 3px; }
+.emoji-options button { height: 34px; border-radius: 4px; background: transparent; font-size: 19px; }
+.emoji-options button:hover { background: #352a3e; }
+.chat-file-attachment { display: flex; align-items: center; gap: 9px; max-width: 240px; padding: 9px 11px; border: 1px solid #493752; border-radius: 6px; background: #241c2a; color: #ddc8e9; text-decoration: none; }
+.chat-file-attachment > span { display: flex; min-width: 0; flex-direction: column; gap: 3px; }
+.chat-file-attachment strong { overflow: hidden; color: #e5d8ec; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.chat-file-attachment small { color: #9b88a6; font-size: 8px; }
+.chat-file-attachment:hover { background: #30263a; }
+.reaction-control-wrap { position: relative; }
+.meeting-reaction-picker { position: absolute; z-index: 25; bottom: 52px; left: 50%; transform: translateX(-50%); display: flex; gap: 4px; padding: 7px; border: 1px solid #46364f; border-radius: 24px; background: #1b1720; box-shadow: 0 8px 24px #0008; }
+.meeting-reaction-picker button { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: transparent; font-size: 19px; }
+.meeting-reaction-picker button:hover { background: #382b42; }
+.call-control.hand-is-raised { color: #f2ce75; border-color: #9c7a37; background: #3b3020; }
+.meeting-reaction-feed { position: absolute; z-index: 12; top: 78px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 6px; pointer-events: none; }
+.meeting-reaction-event { display: flex; align-items: center; gap: 7px; padding: 7px 12px; border: 1px solid #ffffff18; border-radius: 20px; background: #17131dcc; box-shadow: 0 4px 15px #0005; animation: reaction-pop 4.5s ease both; }
+.meeting-reaction-event span { font-size: 21px; }.meeting-reaction-event strong { color: #e7d8ed; font-size: 10px; }
+@keyframes reaction-pop { 0% { opacity: 0; transform: translateY(12px) scale(.8); } 12%,78% { opacity: 1; transform: translateY(0) scale(1); } 100% { opacity: 0; transform: translateY(-15px) scale(.95); } }

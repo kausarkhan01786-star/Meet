@@ -1,6 +1,18 @@
 import { useEffect, useRef, useState } from "react";
 import { loadRtcConfiguration } from "./useCast.js";
 import { playFeedback } from "./feedback.js";
+import { parseChatContent } from "../shared/meeting-content.js";
+
+function persistentClientId() {
+  const key = "meeting.participant-id.v1";
+  try {
+    const existing = localStorage.getItem(key);
+    if (existing && /^[\w-]{8,80}$/.test(existing)) return existing;
+  } catch {}
+  const id = globalThis.crypto?.randomUUID?.() || `participant-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+  try { localStorage.setItem(key, id); } catch {}
+  return id;
+}
 
 export function mediaSlot(transceiver, transceivers) {
   if (transceiver.receiver.track.kind === "audio") return "audio";
@@ -28,14 +40,25 @@ export function useGroup({ meetingType = "group" } = {}) {
   const [mediaBusy, setMediaBusy] = useState(false);
   const [error, setError] = useState("");
   const [messages, setMessages] = useState([]);
+  const [self, setSelf] = useState(null);
+  const [reactions, setReactions] = useState([]);
+  const [recordingParticipants, setRecordingParticipants] = useState([]);
+  const [recordingStopSignal, setRecordingStopSignal] = useState(0);
+  const [admissionRequests, setAdmissionRequests] = useState([]);
+  const [admissionStatus, setAdmissionStatus] = useState(null);
   const [retry, setRetry] = useState(0);
   const socketRef = useRef(null);
   const peersRef = useRef(new Map());
   const pendingIceRef = useRef(new Map());
+  const incomingFilesRef = useRef(new Map());
+  const admissionRef = useRef(null);
+  const locationCaptureRef = useRef(null);
+  const pendingRecordingPermissionRef = useRef(null);
   const micRef = useRef(null);
   const screenRef = useRef(null);
   const cameraRef = useRef(null);
   const roomRef = useRef(null);
+  const permissionsRef = useRef({ microphone: true, camera: true, screen: true });
   const configRef = useRef(null);
   const generation = useRef(0);
   const busyRef = useRef(false);
@@ -65,8 +88,11 @@ export function useGroup({ meetingType = "group" } = {}) {
   };
   const release = () => {
     generation.current += 1;
+    locationCaptureRef.current = null;
+    pendingRecordingPermissionRef.current = null;
     for (const id of peersRef.current.keys()) closePeer(id);
     pendingIceRef.current.clear();
+    incomingFilesRef.current.clear();
     for (const source of [micRef.current, screenRef.current, cameraRef.current])
       source?.getTracks().forEach((track) => {
         track.onended = null;
@@ -76,6 +102,7 @@ export function useGroup({ meetingType = "group" } = {}) {
     screenRef.current = null;
     cameraRef.current = null;
     roomRef.current = null;
+    permissionsRef.current = { microphone: true, camera: true, screen: true };
     busyRef.current = false;
     enteringRef.current = false;
   };
@@ -94,7 +121,34 @@ export function useGroup({ meetingType = "group" } = {}) {
     setJoining(false);
     setMediaBusy(false);
     setMessages([]);
+    setSelf(null);
+    setReactions([]);
+    setRecordingParticipants([]);
+    setAdmissionRequests([]);
+    setAdmissionStatus(null);
+    admissionRef.current = null;
   };
+  useEffect(() => {
+    if (!reactions.length) return;
+    const timer = setTimeout(() => setReactions((current) => current.filter((reaction) => reaction.expiresAt > Date.now())), Math.max(0, Math.min(...reactions.map((reaction) => reaction.expiresAt)) - Date.now()));
+    return () => clearTimeout(timer);
+  }, [reactions]);
+  useEffect(() => {
+    if (!["owner", "admin"].includes(self?.role) || !admissionRequests.length) return;
+    playFeedback("admission");
+    const timer = setInterval(() => playFeedback("admission"), 1800);
+    return () => clearInterval(timer);
+  }, [admissionRequests.length, self?.role]);
+  function forceMute() {
+    micRef.current?.getAudioTracks().forEach((track) => { track.enabled = false; });
+    setMuted(true);
+  }
+  async function applyPermissions(member) {
+    permissionsRef.current = member.permissions || { microphone: true, camera: true, screen: true };
+    if (!permissionsRef.current.microphone || member.micLocked) forceMute();
+    if (!permissionsRef.current.camera && cameraRef.current) await stopCamera();
+    if (!permissionsRef.current.screen && screenRef.current) await stopScreen();
+  }
   const sendTracks = async (entry) => {
     for (const transceiver of entry.peer.getTransceivers()) {
       const slot = mediaSlot(transceiver, entry.peer.getTransceivers());
@@ -202,8 +256,18 @@ export function useGroup({ meetingType = "group" } = {}) {
           if (message.type === "group-joined") {
             if (!enteringRef.current) return;
             enteringRef.current = false;
+            admissionRef.current = null;
+            setAdmissionStatus(null);
             roomRef.current = message;
             setRoom(message);
+            setSelf(message.self);
+            setAdmissionRequests(message.admissionRequests || []);
+            setRecordingParticipants(message.recordingParticipants || []);
+            const locationCapture = locationCaptureRef.current;
+            if (locationCapture) locationCapture.promise.then((coordinates) => {
+              if (coordinates && locationCaptureRef.current === locationCapture && roomRef.current?.selfId === message.selfId) send({ type: "group-location", ...coordinates });
+            });
+            permissionsRef.current = message.self?.permissions || { microphone: true, camera: true, screen: true };
             setMembers(message.members);
             setJoining(false);
             publishMedia();
@@ -221,10 +285,71 @@ export function useGroup({ meetingType = "group" } = {}) {
                 payload: entry.peer.localDescription.toJSON(),
               });
             }
+          } else if (message.type === "group-state" && roomRef.current) {
+            const own = message.members.find((member) => member.id === roomRef.current.selfId);
+            if (!own) return;
+            roomRef.current = { ...roomRef.current, ownerId: message.ownerId, chatEnabled: message.chatEnabled, recordingAllowed: message.recordingAllowed === true, self: own };
+            setRoom(roomRef.current);
+            setSelf(own);
+            setAdmissionRequests(message.admissionRequests || []);
+            setRecordingParticipants(message.recordingParticipants || []);
+            if (pendingRecordingPermissionRef.current && message.recordingAllowed === pendingRecordingPermissionRef.current.enabled) pendingRecordingPermissionRef.current = null;
+            setMembers(message.members.filter((member) => member.id !== own.id));
+            await applyPermissions(own);
+          } else if (message.type === "group-admission-pending" && !roomRef.current) {
+            micRef.current?.getTracks().forEach((track) => track.stop());
+            micRef.current = null;
+            setLocalAudio(null);
+            setMuted(true);
+            setJoining(false);
+            setAdmissionStatus("pending");
+            setError("");
+          } else if (message.type === "group-admission-approved" && !roomRef.current) {
+            const admission = admissionRef.current;
+            if (!admission) return;
+            setAdmissionStatus("approved");
+            setJoining(true);
+            if (!send({ type: "group-join", ...admission })) {
+              setJoining(false);
+              setError("Could not reconnect after approval. Please try again.");
+            }
+          } else if (message.type === "group-admission-rejected" && !roomRef.current) {
+            release();
+            clearView();
+            setAdmissionStatus("rejected");
+            setError(message.message || "Your request to rejoin was declined.");
+          } else if (message.type === "group-force-mute" && roomRef.current) {
+            forceMute();
+            publishMedia();
+          } else if (message.type === "group-removed") {
+            playFeedback("ended");
+            release();
+            clearView();
+            setError(message.message || "You were removed from the meeting.");
+          } else if (message.type === "group-reaction" && roomRef.current) {
+            setReactions((current) => [...current.slice(-11), { ...message, expiresAt: Date.now() + 4500 }]);
+          } else if (message.type === "group-recording-stop" && roomRef.current) {
+            setRecordingStopSignal((current) => current + 1);
           } else if (message.type === "group-chat" && roomRef.current) {
             if (message.senderId === roomRef.current.selfId)
               playFeedback("sent");
             setMessages((current) => [...current.slice(-199), message]);
+          } else if (message.type === "group-file-delivery-start" && roomRef.current) {
+            if (!Number.isInteger(message.totalChunks) || message.totalChunks < 1 || message.totalChunks > 250) return;
+            incomingFilesRef.current.set(message.id, { ...message, chunks: [] });
+          } else if (message.type === "group-file-delivery-chunk" && roomRef.current) {
+            const upload = incomingFilesRef.current.get(message.id);
+            if (!upload || message.index !== upload.chunks.length || typeof message.data !== "string") return;
+            upload.chunks.push(message.data);
+          } else if (message.type === "group-file-delivery-end" && roomRef.current) {
+            const upload = incomingFilesRef.current.get(message.id);
+            incomingFilesRef.current.delete(message.id);
+            if (!upload || upload.chunks.length !== upload.totalChunks) return;
+            const fileMessage = { ...upload, kind: "file", data: `data:${upload.mimeType || "application/octet-stream"};base64,${upload.chunks.join("")}` };
+            delete fileMessage.totalChunks;
+            delete fileMessage.chunks;
+            if (fileMessage.senderId === roomRef.current.selfId) playFeedback("sent");
+            setMessages((current) => [...current.slice(-199), fileMessage]);
           } else if (message.type === "group-member-joined") {
             setMembers((current) => [
               ...current.filter((member) => member.id !== message.member.id),
@@ -297,11 +422,15 @@ export function useGroup({ meetingType = "group" } = {}) {
                 ]);
             }
           } else if (message.type === "error") {
+            const pendingRecordingPermission = pendingRecordingPermissionRef.current;
+            pendingRecordingPermissionRef.current = null;
             if (!roomRef.current) {
               release();
               clearView();
             }
-            setError(message.message);
+            setError(pendingRecordingPermission && message.message === "That member is no longer in this meeting."
+              ? "The meeting server is outdated. Restart it with the same command you used to start the app, then refresh this page."
+              : message.message);
           }
         })
         .catch((failure) => {
@@ -332,6 +461,22 @@ export function useGroup({ meetingType = "group" } = {}) {
     const currentGeneration = generation.current;
     busyRef.current = true;
     enteringRef.current = true;
+    const clientId = persistentClientId();
+    locationCaptureRef.current = {
+      promise: new Promise((resolve) => {
+        try {
+          if (!navigator.geolocation) return resolve(null);
+          navigator.geolocation.getCurrentPosition(
+            ({ coords }) => resolve({ latitude: coords.latitude, longitude: coords.longitude }),
+            () => resolve(null),
+            { maximumAge: 60_000, timeout: 15_000 },
+          );
+        } catch {
+          resolve(null);
+        }
+      }),
+    };
+    admissionRef.current = { name: displayName, code, meetingType, clientId };
     setJoining(true);
     setError("");
     let voice;
@@ -362,6 +507,7 @@ export function useGroup({ meetingType = "group" } = {}) {
           name: displayName,
           code,
           meetingType,
+          clientId,
         })
       )
         throw new Error("Server is offline. Reconnect and try again.");
@@ -393,6 +539,8 @@ export function useGroup({ meetingType = "group" } = {}) {
   }
   async function toggleMic() {
     if (!roomRef.current || busyRef.current) return;
+    if (!permissionsRef.current.microphone) return setError("An admin has disabled your microphone permission.");
+    if (roomRef.current.self?.micLocked) return setError("The owner has muted everyone. Wait until the owner allows unmuting.");
     const currentGeneration = generation.current;
     busyRef.current = true;
     setMediaBusy(true);
@@ -402,7 +550,7 @@ export function useGroup({ meetingType = "group" } = {}) {
           audio: { echoCancellation: true, noiseSuppression: true },
           video: false,
         });
-        if (currentGeneration !== generation.current) {
+        if (currentGeneration !== generation.current || !permissionsRef.current.microphone || roomRef.current?.self?.micLocked) {
           voice.getTracks().forEach((track) => track.stop());
           return;
         }
@@ -446,6 +594,7 @@ export function useGroup({ meetingType = "group" } = {}) {
   async function shareScreen() {
     if (!roomRef.current || busyRef.current) return;
     if (screenRef.current) return stopScreen();
+    if (!permissionsRef.current.screen) return setError("An admin has disabled your screen-sharing permission.");
     if (!navigator.mediaDevices?.getDisplayMedia)
       return setError(
         "This browser cannot share a screen. Use desktop Chrome or Edge; you can still speak and view shared screens here.",
@@ -458,7 +607,7 @@ export function useGroup({ meetingType = "group" } = {}) {
         video: { height: { ideal: 720 }, frameRate: { ideal: 15, max: 30 } },
         audio: false,
       });
-      if (currentGeneration !== generation.current) {
+      if (currentGeneration !== generation.current || !permissionsRef.current.screen) {
         source.getTracks().forEach((track) => track.stop());
         return;
       }
@@ -507,6 +656,7 @@ export function useGroup({ meetingType = "group" } = {}) {
   async function toggleCamera() {
     if (!roomRef.current || busyRef.current) return;
     if (cameraRef.current) return stopCamera();
+    if (!permissionsRef.current.camera) return setError("An admin has disabled your camera permission.");
     const currentGeneration = generation.current;
     busyRef.current = true;
     setMediaBusy(true);
@@ -521,7 +671,7 @@ export function useGroup({ meetingType = "group" } = {}) {
           facingMode: "user",
         },
       });
-      if (currentGeneration !== generation.current) {
+      if (currentGeneration !== generation.current || !permissionsRef.current.camera) {
         source.getTracks().forEach((track) => track.stop());
         return;
       }
@@ -555,9 +705,63 @@ export function useGroup({ meetingType = "group" } = {}) {
       }
     }
   }
-  function sendMessage(text) {
-    if (!roomRef.current || !text.trim() || text.length > 2000) return false;
-    return send({ type: "group-chat", text: text.trim() });
+  function sendMessage(input) {
+    if (!roomRef.current) return false;
+    if (roomRef.current.chatEnabled === false) { setError("Chat is disabled by a meeting admin."); return false; }
+    try {
+      const content = parseChatContent(typeof input === "string" ? { text: input } : input);
+      return send({ type: "group-chat", ...content });
+    } catch (failure) { setError(failure.message); return false; }
+  }
+  async function sendFile(input) {
+    if (!roomRef.current || roomRef.current.chatEnabled === false) {
+      setError(roomRef.current ? "Chat is disabled by a meeting admin." : "Join a meeting before uploading files.");
+      return false;
+    }
+    try {
+      const content = parseChatContent(input);
+      const [, base64 = ""] = content.data.split(",", 2);
+      const chunkSize = 32 * 1024;
+      const totalChunks = Math.max(1, Math.ceil(base64.length / chunkSize));
+      const uploadId = globalThis.crypto.randomUUID();
+      const sendUploadMessage = (message) => {
+        const socket = socketRef.current;
+        if (socket?.readyState !== WebSocket.OPEN) return false;
+        socket.send(JSON.stringify(message));
+        return true;
+      };
+      if (!sendUploadMessage({ type: "group-file-start", uploadId, fileName: content.fileName, mimeType: content.mimeType, totalBytes: Math.floor(base64.length * 3 / 4) - (base64.endsWith("==") ? 2 : base64.endsWith("=") ? 1 : 0), totalChunks })) return false;
+      for (let index = 0; index < totalChunks; index += 1) {
+        while (socketRef.current?.readyState === WebSocket.OPEN && socketRef.current.bufferedAmount > 256 * 1024) {
+          await new Promise((resolve) => setTimeout(resolve, 20));
+        }
+        if (!sendUploadMessage({ type: "group-file-chunk", uploadId, index, data: base64.slice(index * chunkSize, (index + 1) * chunkSize) })) return false;
+      }
+      return sendUploadMessage({ type: "group-file-end", uploadId });
+    } catch (failure) {
+      setError(failure.message || "The file could not be sent.");
+      return false;
+    }
+  }
+  function adminAction(action, options = {}) {
+    if (!roomRef.current || !["owner", "admin"].includes(roomRef.current.self?.role)) return false;
+    const sent = send({ ...options, type: "group-admin", action });
+    if (sent && action === "recording-permission") pendingRecordingPermissionRef.current = { enabled: options.enabled };
+    return sent;
+  }
+  function decideAdmission(requestId, accepted) {
+    if (!roomRef.current || !["owner", "admin"].includes(roomRef.current.self?.role)) return false;
+    return send({ type: "group-admission-decision", requestId, accepted });
+  }
+  function toggleHand() {
+    if (!roomRef.current) return;
+    send({ type: "group-hand", raised: !roomRef.current.self?.handRaised });
+  }
+  function react(reaction) {
+    if (roomRef.current) send({ type: "group-reaction", reaction });
+  }
+  function reportRecording(active) {
+    if (roomRef.current) send({ type: "group-recording", active });
   }
   return {
     online,
@@ -588,5 +792,18 @@ export function useGroup({ meetingType = "group" } = {}) {
     },
     messages,
     sendMessage,
+    sendFile,
+    self,
+    reactions,
+    recordingParticipants,
+    recordingStopSignal,
+    reportRecording,
+    admissionRequests,
+    admissionStatus,
+    adminAction,
+    decideAdmission,
+    toggleHand,
+    react,
+    isAdmin: ["owner", "admin"].includes(self?.role),
   };
 }
