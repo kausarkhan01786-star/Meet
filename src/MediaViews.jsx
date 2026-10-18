@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   Expand,
+  Hand,
   LoaderCircle,
   MicOff,
   VideoOff,
@@ -106,14 +107,17 @@ export function useAudioActivity(stream, enabled) {
 
 export function CameraTile({
   stream,
+  audioStream,
   name,
   local = false,
   enabled = false,
   muted = false,
+  handRaised = false,
 }) {
   const videoRef = useRef(null);
   const [blocked, setBlocked] = useState(false);
   const [ready, setReady] = useState(false);
+  const speaking = useAudioActivity(audioStream, !muted);
   useEffect(() => {
     const video = videoRef.current;
     setReady(false);
@@ -129,7 +133,7 @@ export function CameraTile({
   }, [stream, enabled]);
   return (
     <section
-      className={`camera-tile ${local ? "is-local" : ""}`}
+      className={`camera-tile ${local ? "is-local" : ""} ${speaking ? "is-speaking" : ""}`}
       aria-label={local ? "Your camera" : `${name}'s camera`}
     >
       {enabled ? (
@@ -162,14 +166,20 @@ export function CameraTile({
         </>
       ) : (
         <div className="camera-placeholder">
-          <span>{name.slice(0, 2).toUpperCase()}</span>
+          <span>
+            {name.slice(0, 2).toUpperCase()}
+            <i />
+            <i />
+            <i />
+          </span>
           <small>
-            <VideoOff size={13} /> Camera off
+            <VideoOff size={13} /> Camera off{speaking ? " · Speaking" : ""}
           </small>
         </div>
       )}
       <div className="camera-caption">
         <span>{local ? "You" : name}</span>
+        {handRaised && <Hand size={14} className="raised-hand-icon" aria-label="Hand raised" />}
         {muted && <MicOff size={14} />}
       </div>
     </section>

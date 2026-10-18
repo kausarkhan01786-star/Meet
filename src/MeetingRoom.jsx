@@ -539,25 +539,26 @@ export default function MeetingRoom({
   }
   const screenMembers = group.members.filter((member) => member.sharing);
   const screenCount = screenMembers.length + Number(group.sharing);
-  const cameraCount =
-    group.members.filter((member) => member.camera).length +
-    Number(group.cameraOn);
   const cameraTiles = (
     <>
       <CameraTile
         stream={group.localCamera}
+        audioStream={group.localAudio}
         name={name.trim() || (mode === "create" ? "Host" : "Guest")}
         local
         enabled={group.cameraOn}
         muted={group.muted}
+        handRaised={group.self?.handRaised}
       />
       {group.members.map((member) => (
         <CameraTile
           key={member.id}
           stream={group.cameraStreams[member.id]}
+          audioStream={group.streams[member.id]}
           name={member.name}
           enabled={member.camera}
           muted={member.muted}
+          handRaised={member.handRaised}
         />
       ))}
     </>
@@ -944,73 +945,12 @@ export default function MeetingRoom({
                       />
                     ))}
                   </div>
-                ) : cameraCount ? (
-                  <div className="camera-grid">{cameraTiles}</div>
                 ) : (
-                  <div className="voice-room">
-                    <div className="voice-room-top">
-                      <span className="voice-live">
-                        <AudioLines size={13} />{" "}
-                        {connectedCount
-                          ? "VOICE CONNECTED"
-                          : "YOUR ROOM IS OPEN"}
-                      </span>
-                      <span>
-                        {String(Math.floor(elapsed / 60)).padStart(2, "0")}:
-                        {String(elapsed % 60).padStart(2, "0")}
-                      </span>
-                    </div>
-                    <div className="voice-members">
-                      <VoiceParticipant
-                        name="You"
-                        avatarName={name.trim() || "You"}
-                        local
-                        muted={group.muted}
-                        handRaised={group.self?.handRaised}
-                        stream={group.localAudio}
-                      />
-                      {group.members.map((member, index) => (
-                        <VoiceParticipant
-                          key={member.id}
-                          name={member.name}
-                          tone={index % 3}
-                          muted={member.muted}
-                          handRaised={member.handRaised}
-                          stream={group.streams[member.id]}
-                          connected={
-                            group.connections[member.id] === "connected"
-                          }
-                        />
-                      ))}
-                    </div>
-                    <div className="voice-room-message">
-                      <h2>
-                        {connectedCount
-                          ? "This is what closer sounds like."
-                          : "A little company, one code away."}
-                      </h2>
-                      <p>
-                        {connectedCount
-                          ? "No screen shared. Just a good conversation."
-                          : "Your meeting is ready for someone to join."}
-                      </p>
-                    </div>
-                    <div className="voice-room-bottom">
-                      <LockKeyhole size={12} />
-                      <span>
-                        {single
-                          ? "JUST THE TWO OF YOU"
-                          : `UP TO ${group.room.limit} PEOPLE`}
-                      </span>
-                      <span className="voice-bottom-rule" />
-                      <Headphones size={12} />
-                      <span>VOICE & SCREEN</span>
-                    </div>
-                  </div>
+                  <div className={`camera-grid ${group.members.length === 0 ? "is-single" : ""}`}>{cameraTiles}</div>
                 )}
               </section>
             )}
-            {group.room && screenCount > 0 && cameraCount > 0 && (
+            {group.room && screenCount > 0 && (
               <div className="camera-strip" aria-label="Meeting cameras">
                 {cameraTiles}
               </div>
