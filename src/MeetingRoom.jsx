@@ -28,6 +28,7 @@ import {
   PhoneOff,
   Play,
   Plus,
+  RotateCw,
   Send,
   Search,
   Share2,
@@ -244,6 +245,7 @@ function SharedMediaPanel({ group, onClose }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [results, setResults] = useState([]);
   const [pageToken, setPageToken] = useState("");
+  const [discoveryIndex, setDiscoveryIndex] = useState(0);
   const [nextPageToken, setNextPageToken] = useState("");
   const [searchState, setSearchState] = useState({ loading: false, error: "" });
   const [directLink, setDirectLink] = useState("");
@@ -257,7 +259,10 @@ function SharedMediaPanel({ group, onClose }) {
     const search = async () => {
       setSearchState({ loading: true, error: "" });
       try {
-        const term = searchQuery || (kind === "audio" ? "popular music" : "popular videos");
+        const discoveryTerms = kind === "audio"
+          ? ["popular music", "new songs", "top hits", "global music", "official music"]
+          : ["popular videos", "trending videos", "documentary", "live performance", "movie trailers"];
+        const term = searchQuery || discoveryTerms[discoveryIndex % discoveryTerms.length];
         const params = new URLSearchParams({ kind, q: term });
         if (pageToken) params.set("pageToken", pageToken);
         const response = await fetch(`/api/media/search?${params}`, { signal: controller.signal });
@@ -274,13 +279,20 @@ function SharedMediaPanel({ group, onClose }) {
     };
     const timer = window.setTimeout(search, 250);
     return () => { window.clearTimeout(timer); controller.abort(); };
-  }, [group.room?.code, group.online, kind, searchQuery, pageToken]);
+  }, [group.room?.code, group.online, kind, searchQuery, pageToken, discoveryIndex]);
 
   function play(item) {
     group.playMedia({ kind, title: item.title, videoId: item.videoId });
   }
   function loadMore() {
     if (!searchState.loading && nextPageToken) setPageToken(nextPageToken);
+  }
+  function refreshPlaylist() {
+    if (searchState.loading) return;
+    setQuery("");
+    setSearchQuery("");
+    setPageToken("");
+    setDiscoveryIndex((value) => value + 1);
   }
   async function findDirectLink() {
     setDirectState({ loading: true, error: "" });
@@ -325,7 +337,7 @@ function SharedMediaPanel({ group, onClose }) {
       {!directResult && !directState.loading && !directState.error && <p className="shared-media-note">Paste any embeddable YouTube or YouTube Music link to find it.</p>}
     </> : <>
     <form className="shared-media-search" onSubmit={(event) => { event.preventDefault(); setPageToken(""); setSearchQuery(query.trim()); }}><label htmlFor="shared-media-search-input">Search {kind === "audio" ? "YouTube Music" : "YouTube videos"}</label><div><input id="shared-media-search-input" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={kind === "audio" ? "Search songs or artists" : "Search videos"} /><button type="submit" aria-label="Search YouTube"><Search size={15} /></button></div></form>
-    <div className="shared-media-playlist-heading"><strong>{kind === "audio" ? "Audio playlist" : "Video playlist"}<small>{searchQuery ? "Search results" : "Popular picks"}</small></strong><span>{results.length}</span></div>
+    <div className="shared-media-playlist-heading"><strong>{kind === "audio" ? "Audio playlist" : "Video playlist"}<small>{searchQuery ? "Search results" : "Popular picks"}</small></strong><span className="shared-media-playlist-tools"><button type="button" className={searchState.loading ? "is-spinning" : ""} onClick={refreshPlaylist} disabled={searchState.loading} aria-label="Refresh playlist" title="Show a new playlist"><RotateCw size={13} /></button><span>{results.length}</span></span></div>
     <div className="shared-media-playlist">
       {searchState.loading && !results.length && <div className="shared-media-loading-list" aria-label={`Loading ${kind === "audio" ? "music" : "videos"}`}>
         {[0, 1, 2, 3, 4].map((index) => <span className="shared-media-loading-item" key={index}><i /><b /><em /></span>)}
