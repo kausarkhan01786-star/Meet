@@ -43,23 +43,28 @@ app.get("/api/rtc-config", (request, response) => {
 app.get("/api/media/search", async (request, response) => {
   const kind = request.query.kind === "audio" ? "audio" : request.query.kind === "video" ? "video" : "";
   const query = typeof request.query.q === "string" ? request.query.q.trim().slice(0, 100) : "";
+  const pageToken = typeof request.query.pageToken === "string" && request.query.pageToken.length <= 300 ? request.query.pageToken : "";
   const apiKey = process.env.YOUTUBE_API_KEY?.trim();
   if (!kind || !query) return response.status(400).json({ error: "Choose audio or video and enter a search." });
   if (!apiKey) return response.status(503).json({ error: "YouTube search is not configured. Add YOUTUBE_API_KEY to the server environment." });
-  const cacheKey = `${kind}:${query.toLowerCase()}`;
+  const cacheKey = `${kind}:${query.toLowerCase()}:${pageToken}`;
   const cached = mediaSearchCache.get(cacheKey);
-  if (cached && cached.expiresAt > Date.now()) return response.json({ items: cached.items });
+  if (cached && cached.expiresAt > Date.now()) return response.json({ items: cached.items, nextPageToken: cached.nextPageToken || "" });
   if (cached) mediaSearchCache.delete(cacheKey);
-  const params = new URLSearchParams({ key: apiKey, part: "snippet", type: "video", maxResults: "12", order: "relevance", videoEmbeddable: "true", q: query });
+  const params = new URLSearchParams({ key: apiKey, part: "snippet", type: "video", maxResults: "12", order: kind === "audio" ? "relevance" : "viewCount", videoEmbeddable: "true", videoSyndicated: "true", q: kind === "audio" ? `${query} official music` : query });
+  if (kind === "audio") params.set("videoCategoryId", "10");
+  if (kind === "video") params.set("videoDuration", "medium");
+  if (pageToken) params.set("pageToken", pageToken);
   try {
     const result = await fetch(`https://www.googleapis.com/youtube/v3/search?${params}`);
     const data = await result.json();
     if (!result.ok) return response.status(502).json({ error: data.error?.message || "YouTube search failed." });
-    const items = (data.items || []).filter((item) => item.id?.videoId).map((item) => ({ videoId: item.id.videoId, title: item.snippet?.title || "Untitled video", channel: item.snippet?.channelTitle || "YouTube", thumbnail: item.snippet?.thumbnails?.medium?.url || item.snippet?.thumbnails?.default?.url || "" }));
-    mediaSearchCache.set(cacheKey, { items, expiresAt: Date.now() + 5 * 60_000 });
+    const items = (data.items || []).filter((item) => item.id?.videoId).filter((item) => kind !== "video" || !/\b(shorts?|reels?)\b/i.test(item.snippet?.title || "")).map((item) => ({ videoId: item.id.videoId, title: item.snippet?.title || "Untitled video", channel: item.snippet?.channelTitle || "YouTube", thumbnail: item.snippet?.thumbnails?.medium?.url || item.snippet?.thumbnails?.default?.url || "" }));
+    const payload = { items, nextPageToken: data.nextPageToken || "" };
+    mediaSearchCache.set(cacheKey, { ...payload, expiresAt: Date.now() + 5 * 60_000 });
     while (mediaSearchCache.size > 100) mediaSearchCache.delete(mediaSearchCache.keys().next().value);
     response.set("Cache-Control", "private, max-age=120");
-    return response.json({ items });
+    return response.json(payload);
   } catch {
     return response.status(502).json({ error: "Could not reach YouTube search right now." });
   }

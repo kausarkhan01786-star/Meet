@@ -27,6 +27,7 @@ import {
   PhoneOff,
   Play,
   Plus,
+  RefreshCw,
   Send,
   Search,
   Settings2,
@@ -241,6 +242,8 @@ function SharedMediaPanel({ group, onClose }) {
   const [query, setQuery] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [results, setResults] = useState([]);
+  const [pageToken, setPageToken] = useState("");
+  const [nextPageToken, setNextPageToken] = useState("");
   const [searchState, setSearchState] = useState({ loading: false, error: "" });
   const items = group.mediaPlaylist.filter((item) => item.kind === kind);
   const activeItem = group.activeMedia;
@@ -252,10 +255,12 @@ function SharedMediaPanel({ group, onClose }) {
       try {
         const term = searchQuery || (kind === "audio" ? "popular music" : "popular videos");
         const params = new URLSearchParams({ kind, q: term });
+        if (pageToken) params.set("pageToken", pageToken);
         const response = await fetch(`/api/media/search?${params}`, { signal: controller.signal });
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || "YouTube search failed.");
         setResults(data.items || []);
+        setNextPageToken(data.nextPageToken || "");
         setSearchState({ loading: false, error: "" });
       } catch (error) {
         if (error.name === "AbortError") return;
@@ -265,7 +270,7 @@ function SharedMediaPanel({ group, onClose }) {
     };
     const timer = window.setTimeout(search, 250);
     return () => { window.clearTimeout(timer); controller.abort(); };
-  }, [group.room?.code, group.online, kind, searchQuery]);
+  }, [group.room?.code, group.online, kind, searchQuery, pageToken]);
 
   function play(item) {
     group.playMedia({ kind, title: item.title, videoId: item.videoId });
@@ -274,11 +279,11 @@ function SharedMediaPanel({ group, onClose }) {
     <div className="shared-media-panel-heading"><div><h3>Shared media</h3><p>Browse YouTube and play together.</p></div><button type="button" className="m-icon" onClick={onClose} aria-label="Close shared media"><X size={15} /></button></div>
     {group.isAdmin && <label className="shared-media-permission-setting"><span><strong>Allow members to manage media</strong><small>Let members play audio and videos for everyone.</small></span><input type="checkbox" checked={group.mediaMembersAllowed} onChange={(event) => group.setMediaPermission(event.target.checked)} /></label>}
     <div className="shared-media-kind-switch" role="tablist" aria-label="Shared media type">
-      <button type="button" role="tab" aria-selected={kind === "audio"} onClick={() => { setKind("audio"); setQuery(""); setSearchQuery(""); }}><AudioLines size={14} /> Audio</button>
-      <button type="button" role="tab" aria-selected={kind === "video"} onClick={() => { setKind("video"); setQuery(""); setSearchQuery(""); }}><Video size={14} /> Video</button>
+      <button type="button" role="tab" aria-selected={kind === "audio"} onClick={() => { setKind("audio"); setQuery(""); setSearchQuery(""); setPageToken(""); }}><AudioLines size={14} /> Audio</button>
+      <button type="button" role="tab" aria-selected={kind === "video"} onClick={() => { setKind("video"); setQuery(""); setSearchQuery(""); setPageToken(""); }}><Video size={14} /> Video</button>
     </div>
-    <form className="shared-media-search" onSubmit={(event) => { event.preventDefault(); setSearchQuery(query.trim()); }}><label htmlFor="shared-media-search-input">Search {kind === "audio" ? "YouTube Music" : "YouTube videos"}</label><div><input id="shared-media-search-input" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={kind === "audio" ? "Search songs or artists" : "Search videos"} /><button type="submit" aria-label="Search YouTube"><Search size={15} /></button></div></form>
-    <div className="shared-media-playlist-heading"><strong>{kind === "audio" ? "Audio playlist" : "Video playlist"}<small>{searchQuery ? "Search results" : "Popular picks"}</small></strong><span>{results.length}</span></div>
+    <form className="shared-media-search" onSubmit={(event) => { event.preventDefault(); setPageToken(""); setSearchQuery(query.trim()); }}><label htmlFor="shared-media-search-input">Search {kind === "audio" ? "YouTube Music" : "YouTube videos"}</label><div><input id="shared-media-search-input" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={kind === "audio" ? "Search songs or artists" : "Search videos"} /><button type="submit" aria-label="Search YouTube"><Search size={15} /></button></div></form>
+    <div className="shared-media-playlist-heading"><strong>{kind === "audio" ? "Audio playlist" : "Video playlist"}<small>{searchQuery ? "Search results" : "Popular picks"}</small></strong><span>{results.length}</span><button type="button" className="shared-media-refresh" disabled={searchState.loading} onClick={() => setPageToken(nextPageToken || "")} title="Show new results"><RefreshCw className={searchState.loading ? "spin" : ""} size={13} /> Refresh</button></div>
     <div className="shared-media-playlist">
       {searchState.loading && <p className="shared-media-empty">Finding {kind === "audio" ? "music" : "videos"}…</p>}
       {!searchState.loading && searchState.error && <p className="shared-media-empty shared-media-search-error">{searchState.error}</p>}
