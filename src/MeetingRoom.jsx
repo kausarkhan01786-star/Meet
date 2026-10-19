@@ -244,6 +244,7 @@ function SharedMediaPanel({ group, onClose }) {
   const [kind, setKind] = useState("audio");
   const [query, setQuery] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [searchRevision, setSearchRevision] = useState(0);
   const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   const [results, setResults] = useState([]);
   const [pageToken, setPageToken] = useState("");
@@ -275,13 +276,12 @@ function SharedMediaPanel({ group, onClose }) {
         setSearchState({ loading: false, error: "" });
       } catch (error) {
         if (error.name === "AbortError") return;
-        setResults([]);
         setSearchState({ loading: false, error: error.message || "YouTube search failed." });
       }
     };
     const timer = window.setTimeout(search, 250);
     return () => { window.clearTimeout(timer); controller.abort(); };
-  }, [group.room?.code, group.online, kind, searchQuery, pageToken, discoveryIndex]);
+  }, [group.room?.code, group.online, kind, searchQuery, searchRevision, pageToken, discoveryIndex]);
 
   function play(item) {
     group.playMedia({ kind, title: item.title, videoId: item.videoId });
@@ -296,6 +296,11 @@ function SharedMediaPanel({ group, onClose }) {
     setPageToken("");
     setDiscoveryIndex((value) => value + 1);
   }
+  const normalizedQuery = query.trim().toLowerCase();
+  const normalizedSearchQuery = searchQuery.trim().toLowerCase();
+  const suggestionItems = normalizedQuery === normalizedSearchQuery
+    ? results
+    : results.filter((item) => item.title.toLowerCase().includes(normalizedQuery));
   async function findDirectLink() {
     setDirectState({ loading: true, error: "" });
     setDirectResult(null);
@@ -338,7 +343,13 @@ function SharedMediaPanel({ group, onClose }) {
       </article>}
       {!directResult && !directState.loading && !directState.error && <p className="shared-media-note">Paste any embeddable YouTube or YouTube Music link to find it.</p>}
     </> : <>
-    <form className="shared-media-search" onSubmit={(event) => { event.preventDefault(); setPageToken(""); setSearchQuery(query.trim()); setSuggestionsOpen(false); }}>
+    <form className="shared-media-search" onSubmit={(event) => {
+      event.preventDefault();
+      setPageToken("");
+      setSearchQuery(query.trim());
+      setSearchRevision((revision) => revision + 1);
+      setSuggestionsOpen(Boolean(query.trim()));
+    }}>
       <label htmlFor="shared-media-search-input">Search {kind === "audio" ? "YouTube Music" : "YouTube videos"}</label>
       <div>
         <input
@@ -348,21 +359,19 @@ function SharedMediaPanel({ group, onClose }) {
           onChange={(event) => {
             const value = event.target.value;
             setQuery(value);
-            setSearchQuery(value.trim());
-            setPageToken("");
             setSuggestionsOpen(Boolean(value.trim()));
           }}
           onFocus={() => setSuggestionsOpen(Boolean(query.trim()))}
           onBlur={() => setSuggestionsOpen(false)}
           aria-autocomplete="list"
-          aria-expanded={Boolean(suggestionsOpen && query.trim() && results.length && !searchState.loading)}
+          aria-expanded={Boolean(suggestionsOpen && normalizedQuery && suggestionItems.length && !searchState.loading)}
           aria-controls="shared-media-suggestions"
           placeholder={kind === "audio" ? "Search songs or artists" : "Search videos"}
         />
         <button type="submit" aria-label="Search YouTube"><Search size={15} /></button>
       </div>
-      {suggestionsOpen && query.trim() && !searchState.loading && results.length > 0 && <div className="shared-media-suggestions" id="shared-media-suggestions" role="listbox" aria-label="Search suggestions">
-        {results.slice(0, 6).map((item) => <button
+      {suggestionsOpen && normalizedQuery && !searchState.loading && suggestionItems.length > 0 && <div className="shared-media-suggestions" id="shared-media-suggestions" role="listbox" aria-label="Search suggestions">
+        {suggestionItems.slice(0, 6).map((item) => <button
           type="button"
           role="option"
           aria-selected="false"
@@ -385,7 +394,7 @@ function SharedMediaPanel({ group, onClose }) {
       </div>}
       {!searchState.loading && searchState.error && <p className="shared-media-empty shared-media-search-error">{searchState.error}</p>}
       {!searchState.loading && !searchState.error && !results.length && <p className="shared-media-empty">No results found. Try another search.</p>}
-      {!searchState.error && results.map((item) => <article className={`shared-media-item ${activeItem?.videoId === item.videoId ? "is-active" : ""}`} key={item.videoId}>
+      {results.map((item) => <article className={`shared-media-item ${activeItem?.videoId === item.videoId ? "is-active" : ""}`} key={item.videoId}>
         {item.thumbnail ? <img className="shared-media-item-thumbnail" src={item.thumbnail} alt="" loading="lazy" /> : <span className="shared-media-item-icon">{kind === "audio" ? <AudioLines size={15} /> : <Video size={15} />}</span>}
         <span className="shared-media-item-details"><strong>{item.title}</strong><small>{item.channel}</small></span>
         <button type="button" className="shared-media-item-play" disabled={!group.canManageMedia || !group.online} onClick={() => play(item)} title={`Play ${item.title} for everyone`}><Play size={13} /> Play</button>

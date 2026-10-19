@@ -58,7 +58,7 @@ function getYouTubeVideoId(value) {
 }
 app.get("/api/media/search", async (request, response) => {
   const kind = request.query.kind === "audio" ? "audio" : request.query.kind === "video" ? "video" : "";
-  const query = typeof request.query.q === "string" ? request.query.q.trim().slice(0, 100) : "";
+  const query = typeof request.query.q === "string" ? request.query.q.trim().replace(/\s+/g, " ").slice(0, 100) : "";
   const pageToken = typeof request.query.pageToken === "string" && request.query.pageToken.length <= 300 ? request.query.pageToken : "";
   const apiKey = process.env.YOUTUBE_API_KEY?.trim();
   if (!kind || !query) return response.status(400).json({ error: "Choose audio or video and enter a search." });
@@ -74,10 +74,15 @@ app.get("/api/media/search", async (request, response) => {
   try {
     const result = await fetch(`https://www.googleapis.com/youtube/v3/search?${params}`);
     const data = await result.json();
-    if (!result.ok) return response.status(502).json({ error: data.error?.message || "YouTube search failed." });
+    if (!result.ok) {
+      const reasons = data.error?.errors?.map((error) => error.reason) || [];
+      const quotaExceeded = reasons.some((reason) => ["quotaExceeded", "dailyLimitExceeded", "userRateLimitExceeded", "rateLimitExceeded"].includes(reason)) || /quota exceeded/i.test(data.error?.message || "");
+      if (quotaExceeded) return response.status(429).json({ error: "YouTube search quota has been used up for now. Try again after it resets, or paste a YouTube link under Direct media link." });
+      return response.status(502).json({ error: data.error?.message || "YouTube search failed." });
+    }
     const items = (data.items || []).filter((item) => item.id?.videoId).filter((item) => kind !== "video" || !/\b(shorts?|reels?)\b/i.test(item.snippet?.title || "")).map((item) => ({ videoId: item.id.videoId, title: item.snippet?.title || "Untitled video", channel: item.snippet?.channelTitle || "YouTube", thumbnail: item.snippet?.thumbnails?.medium?.url || item.snippet?.thumbnails?.default?.url || "" }));
     const payload = { items, nextPageToken: data.nextPageToken || "" };
-    mediaSearchCache.set(cacheKey, { ...payload, expiresAt: Date.now() + 5 * 60_000 });
+    mediaSearchCache.set(cacheKey, { ...payload, expiresAt: Date.now() + 30 * 60_000 });
     while (mediaSearchCache.size > 100) mediaSearchCache.delete(mediaSearchCache.keys().next().value);
     response.set("Cache-Control", "private, max-age=120");
     return response.json(payload);
