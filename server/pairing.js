@@ -390,8 +390,10 @@ export function createPairingService({
           const group = groups.get(socket.groupCode);
           if (!group || typeof message.active !== "boolean") return;
           if (message.active && !group.recordingAllowed) return send(socket, { type: "error", message: "Recording is disabled by the meeting owner." });
+          const wasRecording = group.recordingMembers.has(socket.memberId);
           if (message.active) group.recordingMembers.set(socket.memberId, { id: socket.memberId, name: socket.memberName, socket });
           else group.recordingMembers.delete(socket.memberId);
+          if (message.active && !wasRecording) broadcastGroup(group, { type: "group-recording-started", id: randomUUID(), memberId: socket.memberId, name: socket.memberName });
           broadcastGroup(group, (viewer) => groupState(group, viewer));
         } else if (message.type === "group-reaction") {
           const group = groups.get(socket.groupCode);

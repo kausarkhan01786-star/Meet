@@ -520,6 +520,28 @@ function VoiceParticipant({
   );
 }
 
+function speakRecordingAnnouncement(name) {
+  if (!window.speechSynthesis || !window.SpeechSynthesisUtterance) return;
+  const synth = window.speechSynthesis;
+  const utterance = new window.SpeechSynthesisUtterance(`${name} is recording the meeting`);
+  const voices = synth.getVoices();
+  const englishVoices = voices.filter((voice) => voice.lang?.toLowerCase().startsWith("en"));
+  const likelyMaleVoice = englishVoices.find((voice) =>
+    /\b(david|mark|guy|richard|ravi|james|alex|daniel|fred|george|tom|aaron|arthur|oliver|liam)\b/i.test(voice.name),
+  );
+  const selectedVoice = likelyMaleVoice || englishVoices[0];
+  if (selectedVoice) {
+    utterance.voice = selectedVoice;
+    utterance.lang = selectedVoice.lang;
+  } else {
+    utterance.lang = "en-US";
+  }
+  utterance.rate = 0.94;
+  utterance.pitch = 0.72;
+  utterance.volume = 1;
+  synth.speak(utterance);
+}
+
 export default function MeetingRoom({
   meetingType = "group",
   onBack,
@@ -554,6 +576,7 @@ export default function MeetingRoom({
   const [isRecording, setIsRecording] = useState(false);
   const [recordingMessage, setRecordingMessage] = useState("");
   const [savedRecording, setSavedRecording] = useState(null);
+  const announcedRecordingId = useRef(null);
   const attemptedCode = useRef("");
   const creating = useRef(false);
   const copyTimer = useRef(null);
@@ -564,6 +587,13 @@ export default function MeetingRoom({
   const recorderSessionRef = useRef(null);
   const recordingUrlRef = useRef(null);
   const savedRoomCode = useRef(initialSession.roomCode || "");
+  useEffect(() => {
+    const announcement = group.recordingAnnouncement;
+    if (!announcement?.id || announcedRecordingId.current === announcement.id) return;
+    announcedRecordingId.current = announcement.id;
+    setRecordingMessage(`${announcement.name} is recording the meeting.`);
+    speakRecordingAnnouncement(announcement.name || "A participant");
+  }, [group.recordingAnnouncement]);
   async function selectProfileImage(event) {
     const file = event.target.files?.[0];
     event.target.value = "";

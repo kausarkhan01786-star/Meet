@@ -94,6 +94,7 @@ export function useGroup({ meetingType = "group" } = {}) {
   const [self, setSelf] = useState(null);
   const [reactions, setReactions] = useState([]);
   const [recordingParticipants, setRecordingParticipants] = useState([]);
+  const [recordingAnnouncement, setRecordingAnnouncement] = useState(null);
   const [recordingStopSignal, setRecordingStopSignal] = useState(0);
   const [students, setStudents] = useState([]);
   const [studentSubmission, setStudentSubmission] = useState("");
@@ -186,6 +187,7 @@ export function useGroup({ meetingType = "group" } = {}) {
     setSelf(null);
     setReactions([]);
     setRecordingParticipants([]);
+    setRecordingAnnouncement(null);
     setAdmissionRequests([]);
     setStudents([]);
     setStudentSubmission("");
@@ -496,6 +498,8 @@ export function useGroup({ meetingType = "group" } = {}) {
             } else setMembers((current) => current.map((member) => member.id === message.id ? { ...member, profileImage: message.profileImage } : member));
           } else if (message.type === "group-recording-stop" && roomRef.current) {
             setRecordingStopSignal((current) => current + 1);
+          } else if (message.type === "group-recording-started" && roomRef.current) {
+            setRecordingAnnouncement(message);
           } else if (message.type === "group-chat" && roomRef.current) {
             if (message.senderId === roomRef.current.selfId)
               playFeedback("sent");
@@ -986,6 +990,7 @@ export function useGroup({ meetingType = "group" } = {}) {
     self,
     reactions,
     recordingParticipants,
+    recordingAnnouncement,
     recordingStopSignal,
     students,
     studentSubmission,
