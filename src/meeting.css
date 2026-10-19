@@ -3896,6 +3896,9 @@ select:focus {
   background: transparent;
   transform: none;
 }
+.meeting-sidebar .person-avatar::before {
+  display: none;
+}
 .meeting-sidebar .chat-empty > span {
   position: relative;
   border-color: #4e355b;
