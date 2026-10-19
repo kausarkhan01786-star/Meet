@@ -2,22 +2,7 @@
 import { CirclePause, CirclePlay, MonitorPause, MonitorPlay, Pause, Play, Square, UsersRound, Volume2, VolumeX } from "lucide-react";
 
 let youtubeApiPromise;
-const LOCAL_MEDIA_VOLUME_KEY = "meeting-shared-media-volume";
-
-function getStoredVolume() {
-  try {
-    const value = Number(window.localStorage.getItem(LOCAL_MEDIA_VOLUME_KEY));
-    return Number.isFinite(value) ? Math.min(100, Math.max(0, value)) : 100;
-  } catch {
-    return 100;
-  }
-}
-
-function saveStoredVolume(value) {
-  try {
-    window.localStorage.setItem(LOCAL_MEDIA_VOLUME_KEY, String(value));
-  } catch {}
-}
+const INITIAL_MEDIA_VOLUME = 50;
 
 function formatTime(value) {
   const seconds = Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0;
@@ -67,7 +52,7 @@ const YouTubeSharedMediaPlayer = forwardRef(function YouTubeSharedMediaPlayer({ 
   const [playbackError, setPlaybackError] = useState("");
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [volume, setVolume] = useState(getStoredVolume);
+  const [volume, setVolume] = useState(INITIAL_MEDIA_VOLUME);
   const [everyonePlaying, setEveryonePlaying] = useState(Boolean(media.isPlaying));
   syncRef.current = onPlaybackSync;
   canControlRef.current = canControl;
@@ -226,7 +211,6 @@ const YouTubeSharedMediaPlayer = forwardRef(function YouTubeSharedMediaPlayer({ 
     const nextVolume = Number(event.target.value);
     playerRef.current?.setVolume?.(nextVolume);
     setVolume(nextVolume);
-    saveStoredVolume(nextVolume);
     if (nextVolume > 0 && locallyMuted) {
       playerRef.current?.unMute?.();
       setLocallyMuted(false);
@@ -276,7 +260,7 @@ const DirectMediaPlayer = forwardRef(function DirectMediaPlayer({ media, selfId,
   const [error, setError] = useState("");
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [volume, setVolume] = useState(getStoredVolume);
+  const [volume, setVolume] = useState(INITIAL_MEDIA_VOLUME);
   const [everyonePlaying, setEveryonePlaying] = useState(Boolean(media.isPlaying));
   syncRef.current = onPlaybackSync;
 
@@ -333,7 +317,6 @@ const DirectMediaPlayer = forwardRef(function DirectMediaPlayer({ media, selfId,
     if (!element) return;
     element.volume = nextVolume / 100;
     setVolume(nextVolume);
-    saveStoredVolume(nextVolume);
   };
   const toggleEveryonePlayback = () => {
     if (!canControl) return;
