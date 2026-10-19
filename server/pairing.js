@@ -34,7 +34,8 @@ export function createPairingService({
   const refreshSpeakingQueue = (group) => {
     group.speakingQueue = [...group.members.values()].filter((member) => member.groupHandRaised).sort((a, b) => (a.groupHandRaisedOrder || 0) - (b.groupHandRaisedOrder || 0)).map((member) => ({ id: member.memberId, name: member.memberName }));
   };
-  const groupState = (group, viewer) => ({ type: "group-state", ownerId: group.ownerId, chatEnabled: group.chatEnabled, muteAllLocked: group.muteAllLocked === true, recordingAllowed: group.recordingAllowed === true, recordingParticipants: [...(group.recordingMembers?.values() || [])].map(({ id, name }) => ({ id, name })), polls: [...(group.polls?.values() || [])].map((poll) => ({ id: poll.id, question: poll.question, createdBy: poll.createdBy, creatorName: poll.creatorName, createdAt: poll.createdAt, myVote: poll.votes.get(viewer?.memberId) || null, options: poll.options.map((option) => ({ ...option, votes: poll.counts.get(option.id) || 0 })) })), speakingQueue: group.speakingQueue || [], currentSpeaker: group.members.has(group.currentSpeakerId) ? { id: group.currentSpeakerId, name: group.members.get(group.currentSpeakerId).memberName } : null, studentAlreadySubmitted: Boolean(group.students?.has(viewer?.groupClientId)), ...(["owner", "admin"].includes(viewer?.groupRole) ? { students: [...(group.students?.values() || [])] } : {}), members: [...group.members.values()].map((member) => memberInfo(member, ["owner", "admin"].includes(viewer?.groupRole))), admissionRequests: [...group.admissionRequests.values()].map(({ id, name, requestedAt }) => ({ id, name, requestedAt })) });
+  const groupState = (group, viewer) => ({ type: "group-state", ownerId: group.ownerId, chatEnabled: group.chatEnabled, muteAllLocked: group.muteAllLocked === true, recordingAllowed: group.recordingAllowed === true, mediaMembersAllowed: group.mediaMembersAllowed === true, mediaPlaylist: group.mediaPlaylist || [], activeMedia: group.activeMedia || null, recordingParticipants: [...(group.recordingMembers?.values() || [])].map(({ id, name }) => ({ id, name })), polls: [...(group.polls?.values() || [])].map((poll) => ({ id: poll.id, question: poll.question, createdBy: poll.createdBy, creatorName: poll.creatorName, createdAt: poll.createdAt, myVote: poll.votes.get(viewer?.memberId) || null, options: poll.options.map((option) => ({ ...option, votes: poll.counts.get(option.id) || 0 })) })), speakingQueue: group.speakingQueue || [], currentSpeaker: group.members.has(group.currentSpeakerId) ? { id: group.currentSpeakerId, name: group.members.get(group.currentSpeakerId).memberName } : null, studentAlreadySubmitted: Boolean(group.students?.has(viewer?.groupClientId)), ...(["owner", "admin"].includes(viewer?.groupRole) ? { students: [...(group.students?.values() || [])] } : {}), members: [...group.members.values()].map((member) => memberInfo(member, ["owner", "admin"].includes(viewer?.groupRole))), admissionRequests: [...group.admissionRequests.values()].map(({ id, name, requestedAt }) => ({ id, name, requestedAt })) });
+  const canControlMedia = (socket, group) => ["owner", "admin"].includes(socket.groupRole) || group.mediaMembersAllowed === true;
   const clearFileUpload = (socket) => {
     if (!socket.groupFileUpload) return;
     clearTimeout(socket.groupFileUpload.timer);
@@ -232,6 +233,9 @@ export function createPairingService({
               currentSpeakerId: null,
               nextSpeakingOrder: 0,
               speakingQueue: [],
+              mediaMembersAllowed: false,
+              mediaPlaylist: [],
+              activeMedia: null,
               ownerId: null,
               blockedClientIds: new Set(),
               admissionRequests: new Map(),
@@ -309,6 +313,9 @@ export function createPairingService({
             polls: [...group.polls.values()].map((poll) => ({ id: poll.id, question: poll.question, createdBy: poll.createdBy, creatorName: poll.creatorName, createdAt: poll.createdAt, myVote: poll.votes.get(socket.memberId) || null, options: poll.options.map((option) => ({ ...option, votes: poll.counts.get(option.id) || 0 })) })),
             speakingQueue: group.speakingQueue,
             currentSpeaker: group.members.has(group.currentSpeakerId) ? { id: group.currentSpeakerId, name: group.members.get(group.currentSpeakerId).memberName } : null,
+            mediaMembersAllowed: group.mediaMembersAllowed === true,
+            mediaPlaylist: group.mediaPlaylist,
+            activeMedia: group.activeMedia,
             studentAlreadySubmitted: group.students.has(socket.groupClientId),
             ...(["owner", "admin"].includes(socket.groupRole) ? { students: [...group.students.values()] } : {}),
             admissionRequests: [...group.admissionRequests.values()].map(({ id, name, requestedAt }) => ({ id, name, requestedAt })),
@@ -417,6 +424,48 @@ export function createPairingService({
           const group = groups.get(socket.groupCode);
           if (!group || (group.currentSpeakerId !== socket.memberId && !["owner", "admin"].includes(socket.groupRole))) return;
           group.currentSpeakerId = null;
+          broadcastGroup(group, (viewer) => groupState(group, viewer));
+        } else if (message.type === "group-media-permission") {
+          const group = groups.get(socket.groupCode);
+          if (!group || !["owner", "admin"].includes(socket.groupRole) || typeof message.enabled !== "boolean") return;
+          group.mediaMembersAllowed = message.enabled;
+          if (!message.enabled && group.activeMedia && !["owner", "admin"].includes(group.members.get(group.activeMedia.controllerId)?.groupRole)) {
+            group.activeMedia = { ...group.activeMedia, controllerId: socket.memberId, updatedAt: Date.now() };
+          }
+          broadcastGroup(group, (viewer) => groupState(group, viewer));
+        } else if (message.type === "group-media-add") {
+          const group = groups.get(socket.groupCode);
+          if (!group || !canControlMedia(socket, group)) return send(socket, { type: "error", message: "The owner has not allowed you to manage shared media." });
+          const kind = message.kind === "audio" ? "audio" : message.kind === "video" ? "video" : null;
+          const title = typeof message.title === "string" ? message.title.trim() : "";
+          const videoId = typeof message.videoId === "string" ? message.videoId : "";
+          if (!kind || !title || title.length > 120 || !/^[\w-]{11}$/.test(videoId)) return send(socket, { type: "error", message: "Enter a title and a valid YouTube or YouTube Music URL." });
+          if (group.mediaPlaylist.length >= 100) return send(socket, { type: "error", message: "The shared media playlist is full." });
+          socket.mediaAddTimes = (socket.mediaAddTimes || []).filter((time) => time > Date.now() - 60_000);
+          if (socket.mediaAddTimes.length >= 20) return send(socket, { type: "error", message: "Please wait before adding more media." });
+          socket.mediaAddTimes.push(Date.now());
+          group.mediaPlaylist.push({ id: randomUUID(), kind, title, videoId, addedBy: socket.memberName, addedAt: Date.now() });
+          broadcastGroup(group, (viewer) => groupState(group, viewer));
+        } else if (message.type === "group-media-play") {
+          const group = groups.get(socket.groupCode);
+          if (!group || !canControlMedia(socket, group)) return send(socket, { type: "error", message: "The owner has not allowed you to manage shared media." });
+          const item = group.mediaPlaylist.find((entry) => entry.id === message.itemId);
+          if (!item) return send(socket, { type: "error", message: "That media item is no longer in the playlist." });
+          group.activeMedia = { ...item, controllerId: socket.memberId, currentTime: 0, isPlaying: true, updatedAt: Date.now() };
+          broadcastGroup(group, (viewer) => groupState(group, viewer));
+        } else if (message.type === "group-media-stop") {
+          const group = groups.get(socket.groupCode);
+          if (!group || !canControlMedia(socket, group)) return send(socket, { type: "error", message: "The owner has not allowed you to manage shared media." });
+          group.activeMedia = null;
+          broadcastGroup(group, (viewer) => groupState(group, viewer));
+        } else if (message.type === "group-media-playback") {
+          const group = groups.get(socket.groupCode);
+          const media = group?.activeMedia;
+          if (!media || media.controllerId !== socket.memberId || !Number.isFinite(message.currentTime) || message.currentTime < 0 || message.currentTime > 86_400 || typeof message.isPlaying !== "boolean") return;
+          socket.mediaSyncTimes = (socket.mediaSyncTimes || []).filter((time) => time > Date.now() - 60_000);
+          if (socket.mediaSyncTimes.length >= 30) return;
+          socket.mediaSyncTimes.push(Date.now());
+          group.activeMedia = { ...media, currentTime: message.currentTime, isPlaying: message.isPlaying, updatedAt: Date.now() };
           broadcastGroup(group, (viewer) => groupState(group, viewer));
         } else if (message.type === "group-location") {
           const group = groups.get(socket.groupCode);

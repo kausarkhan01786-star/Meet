@@ -21,9 +21,11 @@ import {
   Mic,
   MicOff,
   MonitorUp,
+  Music2,
   MoreHorizontal,
   Phone,
   PhoneOff,
+  Play,
   Plus,
   Send,
   Settings2,
@@ -47,6 +49,7 @@ import {
 import { saveMeetingSession } from "./meetingSession.js";
 import { saveMeetingRecording } from "./meetingRecording.js";
 import { ChatAttachments, MemberActions, MemberLocation, MeetingReactions, ReactionControls, RichMessage, RoleBadge } from "./MeetingTools";
+import { SharedMediaPlayer } from "./SharedMediaPlayer";
 
 async function downloadStudentSheet(students, meetingCode) {
   const pageWidth = 1190;
@@ -232,7 +235,69 @@ function ProfileImagePicker({ profileImage, name, onSelect, onRemove, disabled, 
   );
 }
 
-function ChatPanel({ group, tab, setTab, onClose, isRecording, startRecording, stopRecording, recordingMessage, savedRecording }) {
+function parseYouTubeVideoId(value) {
+  try {
+    const url = new URL(value.trim());
+    const host = url.hostname.toLowerCase().replace(/^www\./, "");
+    if (host === "youtu.be") return url.pathname.split("/").filter(Boolean)[0] || "";
+    if (!["youtube.com", "m.youtube.com", "music.youtube.com", "youtube-nocookie.com"].includes(host)) return "";
+    return url.searchParams.get("v") || url.pathname.split("/").filter(Boolean).find((part, index, parts) => ["embed", "shorts", "live"].includes(parts[index - 1])) || "";
+  } catch {
+    return "";
+  }
+}
+
+function SharedMediaPanel({ group, playerRef }) {
+  const [kind, setKind] = useState("audio");
+  const [title, setTitle] = useState("");
+  const [url, setUrl] = useState("");
+  const [feedback, setFeedback] = useState("");
+  const items = group.mediaPlaylist.filter((item) => item.kind === kind);
+  const activeItem = group.activeMedia;
+  function addMedia(event) {
+    event.preventDefault();
+    const videoId = parseYouTubeVideoId(url);
+    if (!title.trim() || !videoId || videoId.length !== 11) {
+      setFeedback("Add a title and a valid YouTube or YouTube Music link.");
+      return;
+    }
+    if (group.addMedia(kind, title.trim(), videoId)) {
+      setTitle("");
+      setUrl("");
+      setFeedback("");
+    } else setFeedback("Could not add media. Check your meeting connection.");
+  }
+  function play(item) {
+    if (!group.playMedia(item.id)) return;
+    playerRef.current?.play();
+  }
+  return <div className="shared-media-panel">
+    <div className="shared-media-panel-heading"><div><h3>Shared media</h3><p>Play YouTube audio or video together.</p></div><Music2 size={17} /></div>
+    <div className="shared-media-kind-switch" role="tablist" aria-label="Shared media type">
+      <button type="button" role="tab" aria-selected={kind === "audio"} onClick={() => { setKind("audio"); setFeedback(""); }}><AudioLines size={14} /> Audio</button>
+      <button type="button" role="tab" aria-selected={kind === "video"} onClick={() => { setKind("video"); setFeedback(""); }}><Video size={14} /> Video</button>
+    </div>
+    <form className="shared-media-add-form" onSubmit={addMedia}>
+      <label>{kind === "audio" ? "Song or playlist name" : "Video name"}<input maxLength={120} value={title} onChange={(event) => setTitle(event.target.value)} placeholder={kind === "audio" ? "Song title" : "Video title"} /></label>
+      <label>YouTube link<input type="url" value={url} onChange={(event) => setUrl(event.target.value)} placeholder={kind === "audio" ? "youtube.com or music.youtube.com link" : "youtube.com link"} /></label>
+      <button type="submit" disabled={!group.canManageMedia || !group.online}><Plus size={14} /> Add to playlist</button>
+      {!group.canManageMedia && <small>Only Owner/Admin can manage shared media unless they allow members.</small>}
+      {feedback && <small className="shared-media-feedback" role="status">{feedback}</small>}
+    </form>
+    <div className="shared-media-playlist-heading"><strong>{kind === "audio" ? "Audio playlist" : "Video playlist"}</strong><span>{items.length}</span></div>
+    <div className="shared-media-playlist">
+      {!items.length ? <p className="shared-media-empty">No {kind} added yet.</p> : items.map((item) => <article className={`shared-media-item ${activeItem?.id === item.id ? "is-active" : ""}`} key={item.id}>
+        <span className="shared-media-item-icon">{item.kind === "audio" ? <AudioLines size={15} /> : <Video size={15} />}</span>
+        <span className="shared-media-item-details"><strong>{item.title}</strong><small>Added by {item.addedBy}</small></span>
+        <button type="button" className="shared-media-item-play" disabled={!group.canManageMedia || !group.online} onClick={() => play(item)} title={`Play ${item.title} for everyone`}>{activeItem?.id === item.id && activeItem.isPlaying ? "Playing" : <><Play size={13} /> Play</>}</button>
+      </article>)}
+    </div>
+    {activeItem && <div className="shared-media-now-playing"><span>Now playing: <strong>{activeItem.title}</strong></span>{group.canManageMedia && <button type="button" onClick={group.stopMedia}>Stop for everyone</button>}</div>}
+    <p className="shared-media-note">Each person can mute or pause playback on their own device.</p>
+  </div>;
+}
+
+function ChatPanel({ group, tab, setTab, onClose, isRecording, startRecording, stopRecording, recordingMessage, savedRecording, playerRef }) {
   const [draft, setDraft] = useState("");
   const [studentFormOpen, setStudentFormOpen] = useState(false);
   const [studentDetails, setStudentDetails] = useState({ name: "", roll: "", section: "", department: "" });
@@ -499,6 +564,8 @@ function ChatPanel({ group, tab, setTab, onClose, isRecording, startRecording, s
             </>
           )}
         </div>
+      ) : tab === "media" ? (
+        <SharedMediaPanel group={group} playerRef={playerRef} />
       ) : tab === "permissions" ? (
         <div className="admission-requests-list" aria-live="assertive">
           <div className="admission-banner-heading"><strong>Rejoin requests</strong><span>{group.admissionRequests.length} waiting</span></div>
@@ -512,6 +579,7 @@ function ChatPanel({ group, tab, setTab, onClose, isRecording, startRecording, s
               {group.students.length ? <div className="student-sheet-wrap"><table className="student-sheet"><thead><tr><th>Name</th><th>Roll</th><th>Section</th><th>Department</th></tr></thead><tbody>{group.students.map((student) => <tr key={student.id}><td>{student.name}</td><td>{student.roll}</td><td>{student.section}</td><td>{student.department}</td></tr>)}</tbody></table></div> : <p className="student-sheet-empty">No student details submitted yet.</p>}
             </section>
           )}
+          {group.isAdmin && <label className="shared-media-permission-setting"><span><strong>Allow members to manage shared media</strong><small>Members can add, play, and stop YouTube audio/video for everyone.</small></span><input type="checkbox" checked={group.mediaMembersAllowed} onChange={(event) => group.setMediaPermission(event.target.checked)} /></label>}
           <h3>Meeting recording</h3>
           <p>Record the meeting screen and audio, then save the video on this device.</p>
           {group.self?.role === "owner" && <label className="recording-permission-setting"><span><strong>Allow meeting recording</strong><small>Anyone in this meeting can record and save a local copy.</small></span><input type="checkbox" checked={group.room?.recordingAllowed === true} onChange={(event) => group.adminAction("recording-permission", { enabled: event.target.checked })} /></label>}
@@ -605,6 +673,7 @@ export default function MeetingRoom({
   initialSession = {},
 }) {
   const group = useGroup({ meetingType });
+  const sharedMediaPlayerRef = useRef(null);
   const single = meetingType === "single";
   const [mode, setMode] = useState(initialSession.mode || null);
   const [name, setName] = useState(initialSession.name || "");
@@ -1287,7 +1356,20 @@ export default function MeetingRoom({
                 className={`meeting-stage ${screenCount ? "is-screen-stage" : ""}`}
                 aria-label="Call stage"
               >
-                {screenCount ? (
+                {group.activeMedia ? (
+                  <div className={`shared-media-stage is-${group.activeMedia.kind}`}>
+                    {group.activeMedia.kind === "audio" && <div className="shared-media-stage-title"><AudioLines size={25} /><div><strong>{group.activeMedia.title}</strong><small>Shared audio is playing for everyone</small></div></div>}
+                    {group.activeMedia.kind === "video" && <div className="shared-media-stage-video-title"><Video size={18} /><strong>{group.activeMedia.title}</strong></div>}
+                    <SharedMediaPlayer
+                      key={group.activeMedia.id}
+                      ref={sharedMediaPlayerRef}
+                      media={group.activeMedia}
+                      selfId={group.room?.selfId}
+                      canControl={group.activeMedia.controllerId === group.room?.selfId}
+                      onPlaybackSync={group.syncMediaPlayback}
+                    />
+                  </div>
+                ) : screenCount ? (
                   <div className="meeting-screens">
                     {group.sharing && (
                       <SharedScreen
@@ -1446,6 +1528,19 @@ export default function MeetingRoom({
                   <Users size={18} />
                 </button>
                 <button
+                  className={`m-icon ${chatOpen && tab === "media" ? "is-active" : ""}`}
+                  title="Shared audio and video"
+                  aria-label="Shared audio and video"
+                  aria-pressed={chatOpen && tab === "media"}
+                  disabled={!group.room}
+                  onClick={() => {
+                    if (chatOpen && tab === "media") setChatOpen(false);
+                    else { setTab("media"); setChatOpen(true); }
+                  }}
+                >
+                  <Music2 size={18} />
+                </button>
+                <button
                   className={`m-icon ${chatOpen ? "is-active" : ""}`}
                   title="Chat"
                   aria-label="Chat"
@@ -1508,6 +1603,7 @@ export default function MeetingRoom({
                 stopRecording={stopRecording}
                 recordingMessage={recordingMessage}
                 savedRecording={savedRecording}
+                playerRef={sharedMediaPlayerRef}
               />
             </>
           )}

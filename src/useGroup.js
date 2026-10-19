@@ -99,6 +99,9 @@ export function useGroup({ meetingType = "group" } = {}) {
   const [polls, setPolls] = useState([]);
   const [speakingQueue, setSpeakingQueue] = useState([]);
   const [currentSpeaker, setCurrentSpeaker] = useState(null);
+  const [mediaMembersAllowed, setMediaMembersAllowed] = useState(false);
+  const [mediaPlaylist, setMediaPlaylist] = useState([]);
+  const [activeMedia, setActiveMedia] = useState(null);
   const [students, setStudents] = useState([]);
   const [studentSubmission, setStudentSubmission] = useState("");
   const [studentSubmitted, setStudentSubmitted] = useState(false);
@@ -194,6 +197,9 @@ export function useGroup({ meetingType = "group" } = {}) {
     setPolls([]);
     setSpeakingQueue([]);
     setCurrentSpeaker(null);
+    setMediaMembersAllowed(false);
+    setMediaPlaylist([]);
+    setActiveMedia(null);
     setAdmissionRequests([]);
     setStudents([]);
     setStudentSubmission("");
@@ -401,6 +407,9 @@ export function useGroup({ meetingType = "group" } = {}) {
             setPolls(message.polls || []);
             setSpeakingQueue(message.speakingQueue || []);
             setCurrentSpeaker(message.currentSpeaker || null);
+            setMediaMembersAllowed(message.mediaMembersAllowed === true);
+            setMediaPlaylist(message.mediaPlaylist || []);
+            setActiveMedia(message.activeMedia || null);
             setStudents(message.students || []);
             setStudentSubmitted(message.studentAlreadySubmitted === true);
             setStudentSubmission(message.studentAlreadySubmitted ? "You have already submitted your student details for this meeting." : "");
@@ -438,6 +447,9 @@ export function useGroup({ meetingType = "group" } = {}) {
             setPolls(message.polls || []);
             setSpeakingQueue(message.speakingQueue || []);
             setCurrentSpeaker(message.currentSpeaker || null);
+            setMediaMembersAllowed(message.mediaMembersAllowed === true);
+            setMediaPlaylist(message.mediaPlaylist || []);
+            setActiveMedia(message.activeMedia || null);
             setStudents(message.students || []);
             setStudentSubmitted(message.studentAlreadySubmitted === true);
             if (message.studentAlreadySubmitted) setStudentSubmission("You have already submitted your student details for this meeting.");
@@ -967,6 +979,25 @@ export function useGroup({ meetingType = "group" } = {}) {
     if (!roomRef.current) return false;
     return send({ type: "group-speaking-finish" });
   }
+  function setMediaPermission(enabled) {
+    if (!roomRef.current || !["owner", "admin"].includes(roomRef.current.self?.role)) return false;
+    return send({ type: "group-media-permission", enabled });
+  }
+  function addMedia(kind, title, videoId) {
+    if (!roomRef.current || (!["owner", "admin"].includes(roomRef.current.self?.role) && !mediaMembersAllowed)) return false;
+    return send({ type: "group-media-add", kind, title, videoId });
+  }
+  function playMedia(itemId) {
+    if (!roomRef.current || (!["owner", "admin"].includes(roomRef.current.self?.role) && !mediaMembersAllowed)) return false;
+    return send({ type: "group-media-play", itemId });
+  }
+  function stopMedia() {
+    if (!roomRef.current || (!["owner", "admin"].includes(roomRef.current.self?.role) && !mediaMembersAllowed)) return false;
+    return send({ type: "group-media-stop" });
+  }
+  function syncMediaPlayback(state) {
+    if (roomRef.current && activeMedia?.controllerId === roomRef.current.selfId) send({ type: "group-media-playback", ...state });
+  }
   function submitStudentDetails(details) {
     if (!roomRef.current || !online) return false;
     clearTimeout(studentSubmissionTimeoutRef.current);
@@ -1027,6 +1058,15 @@ export function useGroup({ meetingType = "group" } = {}) {
     currentSpeaker,
     advanceSpeakingQueue,
     finishSpeakingTurn,
+    mediaMembersAllowed,
+    mediaPlaylist,
+    activeMedia,
+    setMediaPermission,
+    addMedia,
+    playMedia,
+    stopMedia,
+    syncMediaPlayback,
+    canManageMedia: ["owner", "admin"].includes(self?.role) || mediaMembersAllowed,
     students,
     studentSubmission,
     studentSubmitted,
