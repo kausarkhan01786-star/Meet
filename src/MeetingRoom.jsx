@@ -1479,7 +1479,7 @@ export default function MeetingRoom({
                     ))}
                   </div>
                 ) : (
-                  <div className={`camera-grid ${group.members.length === 0 ? "is-single" : ""}`}>{cameraTiles}</div>
+                  <div className={`camera-grid ${group.members.length === 0 ? "is-single" : group.members.length === 1 ? "is-double" : ""}`}>{cameraTiles}</div>
                 )}
                 </div>
               </section>
