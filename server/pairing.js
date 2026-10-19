@@ -449,7 +449,17 @@ export function createPairingService({
         } else if (message.type === "group-media-play") {
           const group = groups.get(socket.groupCode);
           if (!group || !canControlMedia(socket, group)) return send(socket, { type: "error", message: "The owner has not allowed you to manage shared media." });
-          const item = group.mediaPlaylist.find((entry) => entry.id === message.itemId);
+          let item = group.mediaPlaylist.find((entry) => entry.id === message.itemId);
+          if (!item && (message.kind === "audio" || message.kind === "video")) {
+            const title = typeof message.title === "string" ? message.title.trim().slice(0, 120) : "";
+            const videoId = typeof message.videoId === "string" ? message.videoId : "";
+            if (!title || !/^[\w-]{11}$/.test(videoId) || group.mediaPlaylist.length >= 100) return send(socket, { type: "error", message: "That YouTube item cannot be played." });
+            socket.mediaAddTimes = (socket.mediaAddTimes || []).filter((time) => time > Date.now() - 60_000);
+            if (socket.mediaAddTimes.length >= 20) return send(socket, { type: "error", message: "Please wait before playing more media." });
+            socket.mediaAddTimes.push(Date.now());
+            item = { id: randomUUID(), kind: message.kind, title, videoId, addedBy: socket.memberName, addedAt: Date.now() };
+            group.mediaPlaylist.push(item);
+          }
           if (!item) return send(socket, { type: "error", message: "That media item is no longer in the playlist." });
           group.activeMedia = { ...item, controllerId: socket.memberId, currentTime: 0, isPlaying: true, updatedAt: Date.now() };
           broadcastGroup(group, (viewer) => groupState(group, viewer));

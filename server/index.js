@@ -17,6 +17,7 @@ try {
 
 const production = process.argv.includes("--production");
 const app = express();
+const mediaSearchCache = new Map();
 const addresses = Object.values(networkInterfaces())
   .flat()
   .filter((entry) => entry.family === "IPv4" && !entry.internal)
@@ -38,6 +39,30 @@ app.get("/healthz", (request, response) => response.json({ status: "ok" }));
 app.get("/api/rtc-config", (request, response) => {
   response.set("Cache-Control", "no-store");
   response.json(getRtcConfig());
+});
+app.get("/api/media/search", async (request, response) => {
+  const kind = request.query.kind === "audio" ? "audio" : request.query.kind === "video" ? "video" : "";
+  const query = typeof request.query.q === "string" ? request.query.q.trim().slice(0, 100) : "";
+  const apiKey = process.env.YOUTUBE_API_KEY?.trim();
+  if (!kind || !query) return response.status(400).json({ error: "Choose audio or video and enter a search." });
+  if (!apiKey) return response.status(503).json({ error: "YouTube search is not configured. Add YOUTUBE_API_KEY to the server environment." });
+  const cacheKey = `${kind}:${query.toLowerCase()}`;
+  const cached = mediaSearchCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return response.json({ items: cached.items });
+  if (cached) mediaSearchCache.delete(cacheKey);
+  const params = new URLSearchParams({ key: apiKey, part: "snippet", type: "video", maxResults: "12", order: "relevance", videoEmbeddable: "true", q: query });
+  try {
+    const result = await fetch(`https://www.googleapis.com/youtube/v3/search?${params}`);
+    const data = await result.json();
+    if (!result.ok) return response.status(502).json({ error: data.error?.message || "YouTube search failed." });
+    const items = (data.items || []).filter((item) => item.id?.videoId).map((item) => ({ videoId: item.id.videoId, title: item.snippet?.title || "Untitled video", channel: item.snippet?.channelTitle || "YouTube", thumbnail: item.snippet?.thumbnails?.medium?.url || item.snippet?.thumbnails?.default?.url || "" }));
+    mediaSearchCache.set(cacheKey, { items, expiresAt: Date.now() + 5 * 60_000 });
+    while (mediaSearchCache.size > 100) mediaSearchCache.delete(mediaSearchCache.keys().next().value);
+    response.set("Cache-Control", "private, max-age=120");
+    return response.json({ items });
+  } catch {
+    return response.status(502).json({ error: "Could not reach YouTube search right now." });
+  }
 });
 app.get("/api/network", (request, response) => {
   response.json({

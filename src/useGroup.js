@@ -989,7 +989,7 @@ export function useGroup({ meetingType = "group" } = {}) {
   }
   function playMedia(itemId) {
     if (!roomRef.current || (!["owner", "admin"].includes(roomRef.current.self?.role) && !mediaMembersAllowed)) return false;
-    return send({ type: "group-media-play", itemId });
+    return send(typeof itemId === "object" && itemId ? { type: "group-media-play", ...itemId } : { type: "group-media-play", itemId });
   }
   function stopMedia() {
     if (!roomRef.current || (!["owner", "admin"].includes(roomRef.current.self?.role) && !mediaMembersAllowed)) return false;

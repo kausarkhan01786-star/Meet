@@ -28,6 +28,7 @@ import {
   Play,
   Plus,
   Send,
+  Search,
   Settings2,
   ShieldCheck,
   Square,
@@ -235,69 +236,67 @@ function ProfileImagePicker({ profileImage, name, onSelect, onRemove, disabled, 
   );
 }
 
-function parseYouTubeVideoId(value) {
-  try {
-    const url = new URL(value.trim());
-    const host = url.hostname.toLowerCase().replace(/^www\./, "");
-    if (host === "youtu.be") return url.pathname.split("/").filter(Boolean)[0] || "";
-    if (!["youtube.com", "m.youtube.com", "music.youtube.com", "youtube-nocookie.com"].includes(host)) return "";
-    return url.searchParams.get("v") || url.pathname.split("/").filter(Boolean).find((part, index, parts) => ["embed", "shorts", "live"].includes(parts[index - 1])) || "";
-  } catch {
-    return "";
-  }
-}
-
-function SharedMediaPanel({ group, playerRef }) {
+function SharedMediaPanel({ group, onClose }) {
   const [kind, setKind] = useState("audio");
-  const [title, setTitle] = useState("");
-  const [url, setUrl] = useState("");
-  const [feedback, setFeedback] = useState("");
+  const [query, setQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [results, setResults] = useState([]);
+  const [searchState, setSearchState] = useState({ loading: false, error: "" });
   const items = group.mediaPlaylist.filter((item) => item.kind === kind);
   const activeItem = group.activeMedia;
-  function addMedia(event) {
-    event.preventDefault();
-    const videoId = parseYouTubeVideoId(url);
-    if (!title.trim() || !videoId || videoId.length !== 11) {
-      setFeedback("Add a title and a valid YouTube or YouTube Music link.");
-      return;
-    }
-    if (group.addMedia(kind, title.trim(), videoId)) {
-      setTitle("");
-      setUrl("");
-      setFeedback("");
-    } else setFeedback("Could not add media. Check your meeting connection.");
-  }
+  useEffect(() => {
+    if (!group.room || !group.online) return undefined;
+    const controller = new AbortController();
+    const search = async () => {
+      setSearchState({ loading: true, error: "" });
+      try {
+        const term = searchQuery || (kind === "audio" ? "popular music" : "popular videos");
+        const params = new URLSearchParams({ kind, q: term });
+        const response = await fetch(`/api/media/search?${params}`, { signal: controller.signal });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "YouTube search failed.");
+        setResults(data.items || []);
+        setSearchState({ loading: false, error: "" });
+      } catch (error) {
+        if (error.name === "AbortError") return;
+        setResults([]);
+        setSearchState({ loading: false, error: error.message || "YouTube search failed." });
+      }
+    };
+    const timer = window.setTimeout(search, 250);
+    return () => { window.clearTimeout(timer); controller.abort(); };
+  }, [group.room?.code, group.online, kind, searchQuery]);
+
   function play(item) {
-    if (!group.playMedia(item.id)) return;
-    playerRef.current?.play();
+    group.playMedia({ kind, title: item.title, videoId: item.videoId });
   }
   return <div className="shared-media-panel">
-    <div className="shared-media-panel-heading"><div><h3>Shared media</h3><p>Play YouTube audio or video together.</p></div><Music2 size={17} /></div>
+    <div className="shared-media-panel-heading"><div><h3>Shared media</h3><p>Browse YouTube and play together.</p></div><button type="button" className="m-icon" onClick={onClose} aria-label="Close shared media"><X size={15} /></button></div>
+    {group.isAdmin && <label className="shared-media-permission-setting"><span><strong>Allow members to manage media</strong><small>Let members play audio and videos for everyone.</small></span><input type="checkbox" checked={group.mediaMembersAllowed} onChange={(event) => group.setMediaPermission(event.target.checked)} /></label>}
     <div className="shared-media-kind-switch" role="tablist" aria-label="Shared media type">
-      <button type="button" role="tab" aria-selected={kind === "audio"} onClick={() => { setKind("audio"); setFeedback(""); }}><AudioLines size={14} /> Audio</button>
-      <button type="button" role="tab" aria-selected={kind === "video"} onClick={() => { setKind("video"); setFeedback(""); }}><Video size={14} /> Video</button>
+      <button type="button" role="tab" aria-selected={kind === "audio"} onClick={() => { setKind("audio"); setQuery(""); setSearchQuery(""); }}><AudioLines size={14} /> Audio</button>
+      <button type="button" role="tab" aria-selected={kind === "video"} onClick={() => { setKind("video"); setQuery(""); setSearchQuery(""); }}><Video size={14} /> Video</button>
     </div>
-    <form className="shared-media-add-form" onSubmit={addMedia}>
-      <label>{kind === "audio" ? "Song or playlist name" : "Video name"}<input maxLength={120} value={title} onChange={(event) => setTitle(event.target.value)} placeholder={kind === "audio" ? "Song title" : "Video title"} /></label>
-      <label>YouTube link<input type="url" value={url} onChange={(event) => setUrl(event.target.value)} placeholder={kind === "audio" ? "youtube.com or music.youtube.com link" : "youtube.com link"} /></label>
-      <button type="submit" disabled={!group.canManageMedia || !group.online}><Plus size={14} /> Add to playlist</button>
-      {!group.canManageMedia && <small>Only Owner/Admin can manage shared media unless they allow members.</small>}
-      {feedback && <small className="shared-media-feedback" role="status">{feedback}</small>}
-    </form>
-    <div className="shared-media-playlist-heading"><strong>{kind === "audio" ? "Audio playlist" : "Video playlist"}</strong><span>{items.length}</span></div>
+    <form className="shared-media-search" onSubmit={(event) => { event.preventDefault(); setSearchQuery(query.trim()); }}><label htmlFor="shared-media-search-input">Search {kind === "audio" ? "YouTube Music" : "YouTube videos"}</label><div><input id="shared-media-search-input" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={kind === "audio" ? "Search songs or artists" : "Search videos"} /><button type="submit" aria-label="Search YouTube"><Search size={15} /></button></div></form>
+    <div className="shared-media-playlist-heading"><strong>{kind === "audio" ? "Audio playlist" : "Video playlist"}<small>{searchQuery ? "Search results" : "Popular picks"}</small></strong><span>{results.length}</span></div>
     <div className="shared-media-playlist">
-      {!items.length ? <p className="shared-media-empty">No {kind} added yet.</p> : items.map((item) => <article className={`shared-media-item ${activeItem?.id === item.id ? "is-active" : ""}`} key={item.id}>
-        <span className="shared-media-item-icon">{item.kind === "audio" ? <AudioLines size={15} /> : <Video size={15} />}</span>
-        <span className="shared-media-item-details"><strong>{item.title}</strong><small>Added by {item.addedBy}</small></span>
-        <button type="button" className="shared-media-item-play" disabled={!group.canManageMedia || !group.online} onClick={() => play(item)} title={`Play ${item.title} for everyone`}>{activeItem?.id === item.id && activeItem.isPlaying ? "Playing" : <><Play size={13} /> Play</>}</button>
+      {searchState.loading && <p className="shared-media-empty">Finding {kind === "audio" ? "music" : "videos"}…</p>}
+      {!searchState.loading && searchState.error && <p className="shared-media-empty shared-media-search-error">{searchState.error}</p>}
+      {!searchState.loading && !searchState.error && !results.length && <p className="shared-media-empty">No results found. Try another search.</p>}
+      {!searchState.loading && !searchState.error && results.map((item) => <article className={`shared-media-item ${activeItem?.videoId === item.videoId ? "is-active" : ""}`} key={item.videoId}>
+        {item.thumbnail ? <img className="shared-media-item-thumbnail" src={item.thumbnail} alt="" loading="lazy" /> : <span className="shared-media-item-icon">{kind === "audio" ? <AudioLines size={15} /> : <Video size={15} />}</span>}
+        <span className="shared-media-item-details"><strong>{item.title}</strong><small>{item.channel}</small></span>
+        <button type="button" className="shared-media-item-play" disabled={!group.canManageMedia || !group.online} onClick={() => play(item)} title={`Play ${item.title} for everyone`}><Play size={13} /> Play</button>
       </article>)}
     </div>
+    {!group.canManageMedia && <p className="shared-media-note">Only an Owner/Admin can start shared media. Ask them to allow members to manage it.</p>}
+    {items.length > 0 && <><div className="shared-media-playlist-heading"><strong>Meeting queue</strong><span>{items.length}</span></div><div className="shared-media-playlist">{items.map((item) => <article className={`shared-media-item ${activeItem?.id === item.id ? "is-active" : ""}`} key={item.id}><span className="shared-media-item-icon">{kind === "audio" ? <AudioLines size={15} /> : <Video size={15} />}</span><span className="shared-media-item-details"><strong>{item.title}</strong><small>Added by {item.addedBy}</small></span><button type="button" className="shared-media-item-play" disabled={!group.canManageMedia || !group.online} onClick={() => group.playMedia(item.id)}><Play size={13} /> Play</button></article>)}</div></>}
     {activeItem && <div className="shared-media-now-playing"><span>Now playing: <strong>{activeItem.title}</strong></span>{group.canManageMedia && <button type="button" onClick={group.stopMedia}>Stop for everyone</button>}</div>}
     <p className="shared-media-note">Each person can mute or pause playback on their own device.</p>
   </div>;
 }
 
-function ChatPanel({ group, tab, setTab, onClose, isRecording, startRecording, stopRecording, recordingMessage, savedRecording, playerRef }) {
+function ChatPanel({ group, tab, setTab, onClose, isRecording, startRecording, stopRecording, recordingMessage, savedRecording }) {
   const [draft, setDraft] = useState("");
   const [studentFormOpen, setStudentFormOpen] = useState(false);
   const [studentDetails, setStudentDetails] = useState({ name: "", roll: "", section: "", department: "" });
@@ -564,8 +563,6 @@ function ChatPanel({ group, tab, setTab, onClose, isRecording, startRecording, s
             </>
           )}
         </div>
-      ) : tab === "media" ? (
-        <SharedMediaPanel group={group} playerRef={playerRef} />
       ) : tab === "permissions" ? (
         <div className="admission-requests-list" aria-live="assertive">
           <div className="admission-banner-heading"><strong>Rejoin requests</strong><span>{group.admissionRequests.length} waiting</span></div>
@@ -579,7 +576,6 @@ function ChatPanel({ group, tab, setTab, onClose, isRecording, startRecording, s
               {group.students.length ? <div className="student-sheet-wrap"><table className="student-sheet"><thead><tr><th>Name</th><th>Roll</th><th>Section</th><th>Department</th></tr></thead><tbody>{group.students.map((student) => <tr key={student.id}><td>{student.name}</td><td>{student.roll}</td><td>{student.section}</td><td>{student.department}</td></tr>)}</tbody></table></div> : <p className="student-sheet-empty">No student details submitted yet.</p>}
             </section>
           )}
-          {group.isAdmin && <label className="shared-media-permission-setting"><span><strong>Allow members to manage shared media</strong><small>Members can add, play, and stop YouTube audio/video for everyone.</small></span><input type="checkbox" checked={group.mediaMembersAllowed} onChange={(event) => group.setMediaPermission(event.target.checked)} /></label>}
           <h3>Meeting recording</h3>
           <p>Record the meeting screen and audio, then save the video on this device.</p>
           {group.self?.role === "owner" && <label className="recording-permission-setting"><span><strong>Allow meeting recording</strong><small>Anyone in this meeting can record and save a local copy.</small></span><input type="checkbox" checked={group.room?.recordingAllowed === true} onChange={(event) => group.adminAction("recording-permission", { enabled: event.target.checked })} /></label>}
@@ -692,6 +688,7 @@ export default function MeetingRoom({
   const [chatOpen, setChatOpen] = useState(
     () => initialSession.chatOpen ?? window.innerWidth > 1050,
   );
+  const [mediaPanelOpen, setMediaPanelOpen] = useState(false);
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
   const [tab, setTab] = useState(initialSession.tab || "chat");
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -1353,9 +1350,11 @@ export default function MeetingRoom({
               </div>
             ) : (
               <section
-                className={`meeting-stage ${screenCount ? "is-screen-stage" : ""}`}
+                className={`meeting-stage ${screenCount ? "is-screen-stage" : ""} ${mediaPanelOpen ? "has-media-dock" : ""}`}
                 aria-label="Call stage"
               >
+                {mediaPanelOpen && <div className="shared-media-dock"><SharedMediaPanel group={group} onClose={() => setMediaPanelOpen(false)} /></div>}
+                <div className="meeting-stage-content">
                 {group.activeMedia ? (
                   <div className={`shared-media-stage is-${group.activeMedia.kind}`}>
                     {group.activeMedia.kind === "audio" && <div className="shared-media-stage-title"><AudioLines size={25} /><div><strong>{group.activeMedia.title}</strong><small>Shared audio is playing for everyone</small></div></div>}
@@ -1389,6 +1388,7 @@ export default function MeetingRoom({
                 ) : (
                   <div className={`camera-grid ${group.members.length === 0 ? "is-single" : ""}`}>{cameraTiles}</div>
                 )}
+                </div>
               </section>
             )}
             {group.room && screenCount > 0 && (
@@ -1415,6 +1415,14 @@ export default function MeetingRoom({
               <div className="call-bottom-info">
                 <LockKeyhole size={12} />
                 <span>{single ? "Single meeting" : "Group meeting"}</span>
+                <button
+                  className={`m-icon shared-media-toggle ${mediaPanelOpen ? "is-active" : ""}`}
+                  title="Shared audio and video"
+                  aria-label="Shared audio and video"
+                  aria-pressed={mediaPanelOpen}
+                  disabled={!group.room}
+                  onClick={() => setMediaPanelOpen((open) => !open)}
+                ><Music2 size={15} /></button>
                 {group.room && (
                   <>
                     <span className="bottom-dot" />
@@ -1528,19 +1536,6 @@ export default function MeetingRoom({
                   <Users size={18} />
                 </button>
                 <button
-                  className={`m-icon ${chatOpen && tab === "media" ? "is-active" : ""}`}
-                  title="Shared audio and video"
-                  aria-label="Shared audio and video"
-                  aria-pressed={chatOpen && tab === "media"}
-                  disabled={!group.room}
-                  onClick={() => {
-                    if (chatOpen && tab === "media") setChatOpen(false);
-                    else { setTab("media"); setChatOpen(true); }
-                  }}
-                >
-                  <Music2 size={18} />
-                </button>
-                <button
                   className={`m-icon ${chatOpen ? "is-active" : ""}`}
                   title="Chat"
                   aria-label="Chat"
@@ -1603,7 +1598,6 @@ export default function MeetingRoom({
                 stopRecording={stopRecording}
                 recordingMessage={recordingMessage}
                 savedRecording={savedRecording}
-                playerRef={sharedMediaPlayerRef}
               />
             </>
           )}
