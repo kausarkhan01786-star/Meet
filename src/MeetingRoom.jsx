@@ -456,6 +456,12 @@ function ChatPanel({ group, tab, setTab, onClose, isRecording, startRecording, s
             </div>
           ) : (
             <>
+              <section className="speaking-queue-section" aria-label="Fair speaking queue" aria-live="polite">
+                <div className="speaking-queue-heading"><div><strong>Fair speaking queue</strong><small>First hand raised, first in line</small></div><Hand size={15} /></div>
+                {group.currentSpeaker && <div className="speaking-current"><span><small>Speaking now</small><strong>{group.currentSpeaker.id === group.room?.selfId ? "You" : group.currentSpeaker.name}</strong></span>{(group.currentSpeaker.id === group.room?.selfId || group.isAdmin) && <button type="button" onClick={group.finishSpeakingTurn}>{group.currentSpeaker.id === group.room?.selfId ? "Finish my turn" : "End turn"}</button>}</div>}
+                {group.speakingQueue.length ? <ol className="speaking-queue-list">{group.speakingQueue.map((speaker, index) => <li key={speaker.id}><span className="speaking-queue-position">{index + 1}</span><span>{speaker.id === group.room?.selfId ? "You" : speaker.name}</span>{index === 0 && <small>Next</small>}</li>)}</ol> : <p className="speaking-queue-empty">No one is waiting. Raise your hand to join the queue.</p>}
+                {group.isAdmin && <button type="button" className="speaking-queue-next" disabled={!group.speakingQueue.length} onClick={group.advanceSpeakingQueue}><ArrowRight size={13} /> Invite next speaker</button>}
+              </section>
               <div className="person-row">
                 <span className="person-avatar">{group.self?.profileImage ? <img src={group.self.profileImage} alt="" /> : "YOU"}</span>
                 <div>

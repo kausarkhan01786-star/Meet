@@ -31,7 +31,10 @@ export function createPairingService({
     rescueMode: Boolean(socket.groupRescueMode),
     ...(includeLocation && socket.groupLocation ? { location: socket.groupLocation } : {}),
   });
-  const groupState = (group, viewer) => ({ type: "group-state", ownerId: group.ownerId, chatEnabled: group.chatEnabled, muteAllLocked: group.muteAllLocked === true, recordingAllowed: group.recordingAllowed === true, recordingParticipants: [...(group.recordingMembers?.values() || [])].map(({ id, name }) => ({ id, name })), polls: [...(group.polls?.values() || [])].map((poll) => ({ id: poll.id, question: poll.question, createdBy: poll.createdBy, creatorName: poll.creatorName, createdAt: poll.createdAt, myVote: poll.votes.get(viewer?.memberId) || null, options: poll.options.map((option) => ({ ...option, votes: poll.counts.get(option.id) || 0 })) })), studentAlreadySubmitted: Boolean(group.students?.has(viewer?.groupClientId)), ...(["owner", "admin"].includes(viewer?.groupRole) ? { students: [...(group.students?.values() || [])] } : {}), members: [...group.members.values()].map((member) => memberInfo(member, ["owner", "admin"].includes(viewer?.groupRole))), admissionRequests: [...group.admissionRequests.values()].map(({ id, name, requestedAt }) => ({ id, name, requestedAt })) });
+  const refreshSpeakingQueue = (group) => {
+    group.speakingQueue = [...group.members.values()].filter((member) => member.groupHandRaised).sort((a, b) => (a.groupHandRaisedOrder || 0) - (b.groupHandRaisedOrder || 0)).map((member) => ({ id: member.memberId, name: member.memberName }));
+  };
+  const groupState = (group, viewer) => ({ type: "group-state", ownerId: group.ownerId, chatEnabled: group.chatEnabled, muteAllLocked: group.muteAllLocked === true, recordingAllowed: group.recordingAllowed === true, recordingParticipants: [...(group.recordingMembers?.values() || [])].map(({ id, name }) => ({ id, name })), polls: [...(group.polls?.values() || [])].map((poll) => ({ id: poll.id, question: poll.question, createdBy: poll.createdBy, creatorName: poll.creatorName, createdAt: poll.createdAt, myVote: poll.votes.get(viewer?.memberId) || null, options: poll.options.map((option) => ({ ...option, votes: poll.counts.get(option.id) || 0 })) })), speakingQueue: group.speakingQueue || [], currentSpeaker: group.members.has(group.currentSpeakerId) ? { id: group.currentSpeakerId, name: group.members.get(group.currentSpeakerId).memberName } : null, studentAlreadySubmitted: Boolean(group.students?.has(viewer?.groupClientId)), ...(["owner", "admin"].includes(viewer?.groupRole) ? { students: [...(group.students?.values() || [])] } : {}), members: [...group.members.values()].map((member) => memberInfo(member, ["owner", "admin"].includes(viewer?.groupRole))), admissionRequests: [...group.admissionRequests.values()].map(({ id, name, requestedAt }) => ({ id, name, requestedAt })) });
   const clearFileUpload = (socket) => {
     if (!socket.groupFileUpload) return;
     clearTimeout(socket.groupFileUpload.timer);
@@ -96,7 +99,9 @@ export function createPairingService({
     cancelPendingAdmission(socket);
     const group = groups.get(socket.groupCode);
     if (group) {
+      if (group.currentSpeakerId === socket.memberId) group.currentSpeakerId = null;
       group.members.delete(socket.memberId);
+      refreshSpeakingQueue(group);
       group.recordingMembers?.delete(socket.memberId);
       if (group.ownerId === socket.memberId && group.members.size) {
         const successor = [...group.members.values()].find((member) => member.groupRole === "admin") || group.members.values().next().value;
@@ -123,6 +128,8 @@ export function createPairingService({
       socket.groupPermissions = undefined;
       socket.groupMuteLocked = undefined;
       socket.groupHandRaised = undefined;
+      socket.groupHandRaisedAt = undefined;
+      socket.groupHandRaisedOrder = undefined;
       socket.groupRescueMode = undefined;
       socket.groupLocation = undefined;
     }
@@ -222,6 +229,9 @@ export function createPairingService({
               recordingMembers: new Map(),
               students: new Map(),
               polls: new Map(),
+              currentSpeakerId: null,
+              nextSpeakingOrder: 0,
+              speakingQueue: [],
               ownerId: null,
               blockedClientIds: new Set(),
               admissionRequests: new Map(),
@@ -275,6 +285,8 @@ export function createPairingService({
           socket.groupMuteLocked = group.muteAllLocked && message.type !== "group-create";
           socket.groupMuted = socket.groupMuteLocked;
           socket.groupHandRaised = false;
+          socket.groupHandRaisedAt = 0;
+          socket.groupHandRaisedOrder = 0;
           socket.groupClientId = clientId;
           socket.groupCode = code;
           socket.pendingAdmissionGroupCode = undefined;
@@ -295,6 +307,8 @@ export function createPairingService({
             recordingAllowed: group.recordingAllowed === true,
             recordingParticipants: [...(group.recordingMembers?.values() || [])].map(({ id, name }) => ({ id, name })),
             polls: [...group.polls.values()].map((poll) => ({ id: poll.id, question: poll.question, createdBy: poll.createdBy, creatorName: poll.creatorName, createdAt: poll.createdAt, myVote: poll.votes.get(socket.memberId) || null, options: poll.options.map((option) => ({ ...option, votes: poll.counts.get(option.id) || 0 })) })),
+            speakingQueue: group.speakingQueue,
+            currentSpeaker: group.members.has(group.currentSpeakerId) ? { id: group.currentSpeakerId, name: group.members.get(group.currentSpeakerId).memberName } : null,
             studentAlreadySubmitted: group.students.has(socket.groupClientId),
             ...(["owner", "admin"].includes(socket.groupRole) ? { students: [...group.students.values()] } : {}),
             admissionRequests: [...group.admissionRequests.values()].map(({ id, name, requestedAt }) => ({ id, name, requestedAt })),
@@ -376,10 +390,33 @@ export function createPairingService({
         } else if (message.type === "group-hand") {
           const group = groups.get(socket.groupCode);
           if (!group || typeof message.raised !== "boolean") return;
+          if (socket.groupHandRaised === message.raised) return;
           socket.handTimes = (socket.handTimes || []).filter((time) => time > Date.now() - 10_000);
           if (socket.handTimes.length >= 12) return send(socket, { type: "error", message: "Please wait before changing your hand status again." });
           socket.handTimes.push(Date.now());
           socket.groupHandRaised = message.raised;
+          socket.groupHandRaisedAt = message.raised ? Date.now() : 0;
+          socket.groupHandRaisedOrder = message.raised ? ++group.nextSpeakingOrder : 0;
+          refreshSpeakingQueue(group);
+          broadcastGroup(group, (viewer) => groupState(group, viewer));
+        } else if (message.type === "group-speaking-next") {
+          const group = groups.get(socket.groupCode);
+          if (!group || !["owner", "admin"].includes(socket.groupRole)) return;
+          socket.speakerAdvanceTimes = (socket.speakerAdvanceTimes || []).filter((time) => time > Date.now() - 60_000);
+          if (socket.speakerAdvanceTimes.length >= 20) return send(socket, { type: "error", message: "Please wait before advancing the speaking queue again." });
+          socket.speakerAdvanceTimes.push(Date.now());
+          const nextSpeaker = group.speakingQueue.length ? group.members.get(group.speakingQueue[0].id) : null;
+          if (!nextSpeaker) return;
+          nextSpeaker.groupHandRaised = false;
+          nextSpeaker.groupHandRaisedAt = 0;
+          nextSpeaker.groupHandRaisedOrder = 0;
+          group.currentSpeakerId = nextSpeaker.memberId;
+          refreshSpeakingQueue(group);
+          broadcastGroup(group, (viewer) => groupState(group, viewer));
+        } else if (message.type === "group-speaking-finish") {
+          const group = groups.get(socket.groupCode);
+          if (!group || (group.currentSpeakerId !== socket.memberId && !["owner", "admin"].includes(socket.groupRole))) return;
+          group.currentSpeakerId = null;
           broadcastGroup(group, (viewer) => groupState(group, viewer));
         } else if (message.type === "group-location") {
           const group = groups.get(socket.groupCode);

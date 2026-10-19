@@ -97,6 +97,8 @@ export function useGroup({ meetingType = "group" } = {}) {
   const [recordingAnnouncement, setRecordingAnnouncement] = useState(null);
   const [recordingStopSignal, setRecordingStopSignal] = useState(0);
   const [polls, setPolls] = useState([]);
+  const [speakingQueue, setSpeakingQueue] = useState([]);
+  const [currentSpeaker, setCurrentSpeaker] = useState(null);
   const [students, setStudents] = useState([]);
   const [studentSubmission, setStudentSubmission] = useState("");
   const [studentSubmitted, setStudentSubmitted] = useState(false);
@@ -190,6 +192,8 @@ export function useGroup({ meetingType = "group" } = {}) {
     setRecordingParticipants([]);
     setRecordingAnnouncement(null);
     setPolls([]);
+    setSpeakingQueue([]);
+    setCurrentSpeaker(null);
     setAdmissionRequests([]);
     setStudents([]);
     setStudentSubmission("");
@@ -395,6 +399,8 @@ export function useGroup({ meetingType = "group" } = {}) {
             setAdmissionRequests(message.admissionRequests || []);
             setRecordingParticipants(message.recordingParticipants || []);
             setPolls(message.polls || []);
+            setSpeakingQueue(message.speakingQueue || []);
+            setCurrentSpeaker(message.currentSpeaker || null);
             setStudents(message.students || []);
             setStudentSubmitted(message.studentAlreadySubmitted === true);
             setStudentSubmission(message.studentAlreadySubmitted ? "You have already submitted your student details for this meeting." : "");
@@ -430,6 +436,8 @@ export function useGroup({ meetingType = "group" } = {}) {
             setAdmissionRequests(message.admissionRequests || []);
             setRecordingParticipants(message.recordingParticipants || []);
             setPolls(message.polls || []);
+            setSpeakingQueue(message.speakingQueue || []);
+            setCurrentSpeaker(message.currentSpeaker || null);
             setStudents(message.students || []);
             setStudentSubmitted(message.studentAlreadySubmitted === true);
             if (message.studentAlreadySubmitted) setStudentSubmission("You have already submitted your student details for this meeting.");
@@ -951,6 +959,14 @@ export function useGroup({ meetingType = "group" } = {}) {
     if (!roomRef.current) return false;
     return send({ type: "group-poll-vote", pollId, optionId });
   }
+  function advanceSpeakingQueue() {
+    if (!roomRef.current || !["owner", "admin"].includes(roomRef.current.self?.role)) return false;
+    return send({ type: "group-speaking-next" });
+  }
+  function finishSpeakingTurn() {
+    if (!roomRef.current) return false;
+    return send({ type: "group-speaking-finish" });
+  }
   function submitStudentDetails(details) {
     if (!roomRef.current || !online) return false;
     clearTimeout(studentSubmissionTimeoutRef.current);
@@ -1007,6 +1023,10 @@ export function useGroup({ meetingType = "group" } = {}) {
     polls,
     createPoll,
     votePoll,
+    speakingQueue,
+    currentSpeaker,
+    advanceSpeakingQueue,
+    finishSpeakingTurn,
     students,
     studentSubmission,
     studentSubmitted,
