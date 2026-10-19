@@ -28,6 +28,7 @@ export function createPairingService({
     permissions: socket.groupPermissions || { microphone: true, camera: true, screen: true },
     micLocked: Boolean(socket.groupMuteLocked),
     handRaised: Boolean(socket.groupHandRaised),
+    rescueMode: Boolean(socket.groupRescueMode),
     ...(includeLocation && socket.groupLocation ? { location: socket.groupLocation } : {}),
   });
   const groupState = (group, viewer) => ({ type: "group-state", ownerId: group.ownerId, chatEnabled: group.chatEnabled, muteAllLocked: group.muteAllLocked === true, recordingAllowed: group.recordingAllowed === true, recordingParticipants: [...(group.recordingMembers?.values() || [])].map(({ id, name }) => ({ id, name })), studentAlreadySubmitted: Boolean(group.students?.has(viewer?.groupClientId)), ...(["owner", "admin"].includes(viewer?.groupRole) ? { students: [...(group.students?.values() || [])] } : {}), members: [...group.members.values()].map((member) => memberInfo(member, ["owner", "admin"].includes(viewer?.groupRole))), admissionRequests: [...group.admissionRequests.values()].map(({ id, name, requestedAt }) => ({ id, name, requestedAt })) });
@@ -122,6 +123,7 @@ export function createPairingService({
       socket.groupPermissions = undefined;
       socket.groupMuteLocked = undefined;
       socket.groupHandRaised = undefined;
+      socket.groupRescueMode = undefined;
       socket.groupLocation = undefined;
     }
     const room = rooms.get(socket.roomCode);
@@ -470,6 +472,15 @@ export function createPairingService({
             { type: "group-member-media", ...memberInfo(socket) },
             socket,
           );
+        } else if (message.type === "group-rescue-mode") {
+          const group = groups.get(socket.groupCode);
+          if (!group?.members.has(socket.memberId)) return;
+          socket.groupRescueMode = message.enabled === true;
+          broadcastGroup(group, {
+            type: "group-rescue-mode",
+            id: socket.memberId,
+            enabled: socket.groupRescueMode,
+          }, socket);
         } else if (message.type === "group-signal") {
           const group = groups.get(socket.groupCode);
           const target = group?.members.get(message.to);

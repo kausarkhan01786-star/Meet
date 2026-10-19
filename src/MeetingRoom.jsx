@@ -9,6 +9,7 @@ import {
   Copy,
   Download,
   FileSpreadsheet,
+  Gauge,
   GraduationCap,
   Headphones,
   Hand,
@@ -1334,6 +1335,21 @@ export default function MeetingRoom({
                 </button>
               </div>
               <div className="call-bottom-panels">
+                <button
+                  className={`m-icon rescue-mode-control ${group.rescueMode ? "is-active" : ""}`}
+                  title={`Connection quality: ${group.connectionQuality}. ${group.rescueMode ? "Turn rescue mode off" : "Turn on weak-network rescue"}`}
+                  aria-label={`${group.rescueMode ? "Disable" : "Enable"} weak-network rescue mode. Connection quality: ${group.connectionQuality}.`}
+                  aria-pressed={group.rescueMode}
+                  disabled={!group.room}
+                  onClick={() => group.setRescueMode(!group.rescueMode)}
+                >
+                  <Gauge size={16} />
+                  <span>{group.rescueMode ? "Rescue on" : "Rescue"}</span>
+                  <span className="connection-quality-label">
+                    {group.connectionQuality === "poor" ? "Weak" : group.connectionQuality === "unstable" || group.connectionQuality === "connecting" ? "Fair" : group.connectionQuality === "good" ? "Good" : "…"}
+                  </span>
+                  <i className={`connection-quality-dot quality-${group.connectionQuality}`} />
+                </button>
                 <button
                   className="m-icon"
                   title="Participants"

@@ -24,6 +24,54 @@ export function mediaSlot(transceiver, transceivers) {
     : "camera";
 }
 
+async function applyConnectionRescue(entry, enabled, originalParameters) {
+  const transceivers = entry.peer.getTransceivers();
+  for (const transceiver of transceivers) {
+    const sender = transceiver.sender;
+    const kind = sender.track?.kind || transceiver.receiver.track.kind;
+    if (kind !== "audio" && kind !== "video") continue;
+    if (!enabled && !originalParameters.has(sender)) continue;
+    try {
+      const parameters = sender.getParameters();
+      if (!parameters.encodings?.length) continue;
+      if (!originalParameters.has(sender)) {
+        originalParameters.set(sender, parameters.encodings.map((encoding) => ({
+          maxBitrate: encoding.maxBitrate,
+          maxFramerate: encoding.maxFramerate,
+          scaleResolutionDownBy: encoding.scaleResolutionDownBy,
+          priority: encoding.priority,
+        })));
+      }
+      const originals = originalParameters.get(sender);
+      const slot = kind === "video" ? mediaSlot(transceiver, transceivers) : "audio";
+      parameters.encodings = parameters.encodings.map((encoding, index) => {
+        const original = originals[index] || {};
+        if (!enabled) {
+          const restored = { ...encoding };
+          for (const key of ["maxBitrate", "maxFramerate", "scaleResolutionDownBy", "priority"]) {
+            if (original[key] === undefined) delete restored[key];
+            else restored[key] = original[key];
+          }
+          return restored;
+        }
+        if (slot === "audio") return { ...encoding, priority: "high" };
+        return {
+          ...encoding,
+          maxBitrate: slot === "screen" ? 550_000 : 240_000,
+          maxFramerate: slot === "screen" ? 10 : 12,
+          scaleResolutionDownBy: slot === "screen"
+            ? Math.max(1, encoding.scaleResolutionDownBy || 1)
+            : Math.max(2, encoding.scaleResolutionDownBy || 1),
+          priority: "low",
+        };
+      });
+      await sender.setParameters(parameters);
+    } catch {
+      // Network rescue is best-effort; some browsers reject sender tuning.
+    }
+  }
+}
+
 export function useGroup({ meetingType = "group" } = {}) {
   const [online, setOnline] = useState(false);
   const [joining, setJoining] = useState(false);
@@ -34,6 +82,8 @@ export function useGroup({ meetingType = "group" } = {}) {
   const [localAudio, setLocalAudio] = useState(null);
   const [localCamera, setLocalCamera] = useState(null);
   const [cameraOn, setCameraOn] = useState(false);
+  const [rescueMode, setRescueModeState] = useState(false);
+  const [connectionQuality, setConnectionQuality] = useState("checking");
   const [connections, setConnections] = useState({});
   const [muted, setMuted] = useState(true);
   const [sharing, setSharing] = useState(false);
@@ -59,6 +109,8 @@ export function useGroup({ meetingType = "group" } = {}) {
   const locationCaptureRef = useRef(null);
   const pendingRecordingPermissionRef = useRef(null);
   const studentSubmissionTimeoutRef = useRef(null);
+  const rescueModeRef = useRef(false);
+  const originalSenderParametersRef = useRef(new WeakMap());
   const micRef = useRef(null);
   const screenRef = useRef(null);
   const cameraRef = useRef(null);
@@ -121,6 +173,9 @@ export function useGroup({ meetingType = "group" } = {}) {
     setLocalAudio(null);
     setLocalCamera(null);
     setCameraOn(false);
+    rescueModeRef.current = false;
+    setRescueModeState(false);
+    setConnectionQuality("checking");
     setConnections({});
     setLocalScreen(null);
     setSharing(false);
@@ -143,6 +198,59 @@ export function useGroup({ meetingType = "group" } = {}) {
     const timer = setTimeout(() => setReactions((current) => current.filter((reaction) => reaction.expiresAt > Date.now())), Math.max(0, Math.min(...reactions.map((reaction) => reaction.expiresAt)) - Date.now()));
     return () => clearTimeout(timer);
   }, [reactions]);
+  useEffect(() => {
+    if (!room?.selfId) {
+      setConnectionQuality("checking");
+      return undefined;
+    }
+    let active = true;
+    let polling = false;
+    const updateQuality = async () => {
+      if (polling) return;
+      polling = true;
+      try {
+        const entry = [...peersRef.current.values()].find(({ peer }) => peer.connectionState === "connected");
+        if (!entry) {
+          if (active) setConnectionQuality(peersRef.current.size ? "connecting" : "checking");
+          return;
+        }
+        const stats = await entry.peer.getStats();
+        let rttMs = 0;
+        let packetLoss = 0;
+        let outgoingBitrate = 0;
+        for (const report of stats.values()) {
+          if (report.type === "candidate-pair" && (report.selected || (report.nominated && report.state === "succeeded"))) {
+            rttMs = Math.max(rttMs, (report.currentRoundTripTime || 0) * 1000);
+            outgoingBitrate = Math.max(outgoingBitrate, report.availableOutgoingBitrate || 0);
+          }
+          const isAudio = report.kind === "audio" || report.mediaType === "audio";
+          if (isAudio && report.type === "remote-inbound-rtp" && Number.isFinite(report.fractionLost))
+            packetLoss = Math.max(packetLoss, report.fractionLost);
+          if (isAudio && report.type === "inbound-rtp" && Number.isFinite(report.packetsLost) && Number.isFinite(report.packetsReceived)) {
+            const totalPackets = Math.max(1, report.packetsLost + report.packetsReceived);
+            packetLoss = Math.max(packetLoss, Math.max(0, report.packetsLost) / totalPackets);
+          }
+        }
+        if (!active) return;
+        const quality = rttMs > 550 || packetLoss > 0.1 || (outgoingBitrate > 0 && outgoingBitrate < 300_000)
+          ? "poor"
+          : rttMs > 280 || packetLoss > 0.035 || (outgoingBitrate > 0 && outgoingBitrate < 700_000)
+            ? "unstable"
+            : "good";
+        setConnectionQuality(quality);
+      } catch {
+        if (active) setConnectionQuality("unknown");
+      } finally {
+        polling = false;
+      }
+    };
+    updateQuality();
+    const timer = window.setInterval(updateQuality, 5000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, [room?.selfId]);
   useEffect(() => {
     if (!["owner", "admin"].includes(self?.role) || !admissionRequests.length) return;
     playFeedback("admission");
@@ -171,8 +279,17 @@ export function useGroup({ meetingType = "group" } = {}) {
       transceiver.direction = "sendrecv";
       await transceiver.sender.replaceTrack(track || null);
     }
+    await applyConnectionRescue(entry, rescueModeRef.current || entry.memberRescueMode, originalSenderParametersRef.current);
   };
-  const createPeer = (id, initiator) => {
+  function setRescueMode(enabled) {
+    const next = enabled === true;
+    rescueModeRef.current = next;
+    setRescueModeState(next);
+    if (roomRef.current) send({ type: "group-rescue-mode", enabled: next });
+    for (const entry of peersRef.current.values())
+      applyConnectionRescue(entry, next || entry.memberRescueMode, originalSenderParametersRef.current);
+  }
+  const createPeer = (id, initiator, memberRescueMode = false) => {
     if (peersRef.current.has(id)) return peersRef.current.get(id);
     const peer = new RTCPeerConnection({
       iceServers: configRef.current.iceServers,
@@ -180,7 +297,7 @@ export function useGroup({ meetingType = "group" } = {}) {
     });
     const remote = new MediaStream();
     const camera = new MediaStream();
-    const entry = { peer, remote, camera };
+    const entry = { peer, remote, camera, memberRescueMode };
     peersRef.current.set(id, entry);
     if (initiator) {
       peer.addTransceiver("audio", { direction: "sendrecv" });
@@ -286,7 +403,7 @@ export function useGroup({ meetingType = "group" } = {}) {
             setJoining(false);
             publishMedia();
             for (const member of message.members) {
-              const entry = createPeer(member.id, true);
+              const entry = createPeer(member.id, true, member.rescueMode === true);
               await sendTracks(entry);
               if (!active || currentGeneration !== generation.current) return;
               await entry.peer.setLocalDescription(
@@ -312,6 +429,13 @@ export function useGroup({ meetingType = "group" } = {}) {
             if (message.studentAlreadySubmitted) setStudentSubmission("You have already submitted your student details for this meeting.");
             if (pendingRecordingPermissionRef.current && message.recordingAllowed === pendingRecordingPermissionRef.current.enabled) pendingRecordingPermissionRef.current = null;
             setMembers((current) => message.members.filter((member) => member.id !== own.id).map((member) => ({ ...member, profileImage: member.profileImage || current.find((existing) => existing.id === member.id)?.profileImage })));
+            for (const member of message.members) {
+              if (member.id === own.id) continue;
+              const entry = peersRef.current.get(member.id);
+              if (!entry) continue;
+              entry.memberRescueMode = member.rescueMode === true;
+              await applyConnectionRescue(entry, rescueModeRef.current || entry.memberRescueMode, originalSenderParametersRef.current);
+            }
             await applyPermissions(own);
           } else if (message.type === "group-admission-pending" && !roomRef.current) {
             micRef.current?.getTracks().forEach((track) => track.stop());
@@ -345,6 +469,13 @@ export function useGroup({ meetingType = "group" } = {}) {
             setError(message.message || "You were removed from the meeting.");
           } else if (message.type === "group-reaction" && roomRef.current) {
             setReactions((current) => [...current.slice(-11), { ...message, expiresAt: Date.now() + 4500 }]);
+          } else if (message.type === "group-rescue-mode" && roomRef.current) {
+            const entry = peersRef.current.get(message.id);
+            if (entry) {
+              entry.memberRescueMode = message.enabled === true;
+              await applyConnectionRescue(entry, rescueModeRef.current || entry.memberRescueMode, originalSenderParametersRef.current);
+            }
+            setMembers((current) => current.map((member) => member.id === message.id ? { ...member, rescueMode: message.enabled === true } : member));
           } else if (message.type === "group-students" && roomRef.current && ["owner", "admin"].includes(roomRef.current.self?.role)) {
             setStudents(Array.isArray(message.students) ? message.students : []);
           } else if (message.type === "group-student-submitted" && roomRef.current) {
@@ -829,6 +960,9 @@ export function useGroup({ meetingType = "group" } = {}) {
     localAudio,
     localCamera,
     cameraOn,
+    rescueMode,
+    connectionQuality,
+    setRescueMode,
     toggleCamera,
     connections,
     muted,
