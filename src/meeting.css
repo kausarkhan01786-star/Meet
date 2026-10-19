@@ -2610,7 +2610,7 @@ button:active:not(:disabled) {
   flex: 1 1 0;
   width: 100%;
   max-width: 1540px;
-  max-height: 725px;
+  max-height: none;
   align-self: center;
   overflow: hidden;
 }
@@ -2956,8 +2956,8 @@ button:active:not(:disabled) {
 .camera-strip {
   display: flex;
   gap: 12px;
-  min-height: 150px;
-  height: 150px;
+  min-height: 104px;
+  height: 104px;
   flex-shrink: 0;
   overflow-x: auto;
   padding-bottom: 5px;
@@ -2966,7 +2966,7 @@ button:active:not(:disabled) {
   scrollbar-color: #644578 transparent;
 }
 .camera-strip .camera-tile {
-  flex: 0 0 225px;
+  flex: 0 0 156px;
   aspect-ratio: auto;
   height: 100%;
   max-height: none;
@@ -2975,13 +2975,13 @@ button:active:not(:disabled) {
   height: 100%;
 }
 .camera-strip .camera-placeholder {
-  padding: 10px;
-  gap: 8px;
+  padding: 6px;
+  gap: 4px;
 }
 .camera-strip .camera-placeholder > span {
-  width: 46px;
-  height: 46px;
-  font-size: 15px;
+  width: 36px;
+  height: 36px;
+  font-size: 12px;
 }
 .camera-strip .camera-placeholder > span > i { inset: -6px; }
 .camera-strip .camera-placeholder > span > i:nth-of-type(2) { inset: -12px; }
@@ -3011,12 +3011,12 @@ button:active:not(:disabled) {
     min-height: 0;
   }
   .camera-strip {
-    height: 120px;
-    min-height: 120px;
+    height: 88px;
+    min-height: 88px;
     gap: 9px;
   }
   .camera-strip .camera-tile {
-    flex-basis: 180px;
+    flex-basis: 130px;
     min-height: 0;
   }
 }
