@@ -245,7 +245,6 @@ function SharedMediaPanel({ group, onClose }) {
   const [query, setQuery] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchRevision, setSearchRevision] = useState(0);
-  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   const [results, setResults] = useState([]);
   const [pageToken, setPageToken] = useState("");
   const [discoveryIndex, setDiscoveryIndex] = useState(0);
@@ -296,11 +295,6 @@ function SharedMediaPanel({ group, onClose }) {
     setPageToken("");
     setDiscoveryIndex((value) => value + 1);
   }
-  const normalizedQuery = query.trim().toLowerCase();
-  const normalizedSearchQuery = searchQuery.trim().toLowerCase();
-  const suggestionItems = normalizedQuery === normalizedSearchQuery
-    ? results
-    : results.filter((item) => item.title.toLowerCase().includes(normalizedQuery));
   async function findDirectLink() {
     setDirectState({ loading: true, error: "" });
     setDirectResult(null);
@@ -348,7 +342,6 @@ function SharedMediaPanel({ group, onClose }) {
       setPageToken("");
       setSearchQuery(query.trim());
       setSearchRevision((revision) => revision + 1);
-      setSuggestionsOpen(Boolean(query.trim()));
     }}>
       <label htmlFor="shared-media-search-input">Search {kind === "audio" ? "YouTube Music" : "YouTube videos"}</label>
       <div>
@@ -356,36 +349,11 @@ function SharedMediaPanel({ group, onClose }) {
           id="shared-media-search-input"
           type="search"
           value={query}
-          onChange={(event) => {
-            const value = event.target.value;
-            setQuery(value);
-            setSuggestionsOpen(Boolean(value.trim()));
-          }}
-          onFocus={() => setSuggestionsOpen(Boolean(query.trim()))}
-          onBlur={() => setSuggestionsOpen(false)}
-          aria-autocomplete="list"
-          aria-expanded={Boolean(suggestionsOpen && normalizedQuery && suggestionItems.length && !searchState.loading)}
-          aria-controls="shared-media-suggestions"
+          onChange={(event) => setQuery(event.target.value)}
           placeholder={kind === "audio" ? "Search songs or artists" : "Search videos"}
         />
         <button type="submit" aria-label="Search YouTube"><Search size={15} /></button>
       </div>
-      {suggestionsOpen && normalizedQuery && !searchState.loading && suggestionItems.length > 0 && <div className="shared-media-suggestions" id="shared-media-suggestions" role="listbox" aria-label="Search suggestions">
-        {suggestionItems.slice(0, 6).map((item) => <button
-          type="button"
-          role="option"
-          aria-selected="false"
-          className="shared-media-suggestion"
-          key={item.videoId}
-          onMouseDown={(event) => event.preventDefault()}
-          onClick={() => {
-            setSuggestionsOpen(false);
-            play(item);
-          }}
-        >
-          <span>{item.title}</span>
-        </button>)}
-      </div>}
     </form>
     <div className="shared-media-playlist-heading"><strong>{kind === "audio" ? "Audio playlist" : "Video playlist"}<small>{searchQuery ? "Search results" : "Popular picks"}</small></strong><span className="shared-media-playlist-tools"><button type="button" className={searchState.loading ? "is-spinning" : ""} onClick={refreshPlaylist} disabled={searchState.loading} aria-label="Refresh playlist" title="Show a new playlist"><RotateCw size={13} /></button><span>{results.length}</span></span></div>
     <div className="shared-media-playlist">
