@@ -3504,6 +3504,7 @@ button:active:not(:disabled) {
 .shared-media-youtube-frame { width: 100%; min-width: min(200px, 100%); min-height: 200px; aspect-ratio: 16 / 9; background: #09080b; }
 .shared-media-stage.is-video .shared-media-youtube-frame { flex: 1; min-height: 0; aspect-ratio: auto; }
 .shared-media-youtube-frame > div, .shared-media-youtube-frame iframe { display: block; width: 100%; height: 100%; border: 0; }
+.shared-media-youtube-frame iframe { pointer-events: none; }
 .shared-media-playback-controls { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 46px; padding: 6px 9px; border: 1px solid #493752; border-radius: 24px; background: #17111de6; box-shadow: 0 8px 22px #08050c55; }
 .shared-media-playback-controls > i { width: 1px; height: 22px; margin: 0 2px; background: #5b4767; }
 .shared-media-playback-controls button { display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 1px solid #6f5680; border-radius: 50%; background: radial-gradient(circle at 30% 25%, #76568b, #30223a); color: #f4e7fa; box-shadow: inset 0 1px #ffffff22, 0 3px 8px #0005; }

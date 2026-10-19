@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+﻿import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { CirclePause, CirclePlay, MonitorPause, MonitorPlay, Pause, Play, Square, UsersRound, Volume2, VolumeX } from "lucide-react";
 
 let youtubeApiPromise;
@@ -69,7 +69,6 @@ const YouTubeSharedMediaPlayer = forwardRef(function YouTubeSharedMediaPlayer({ 
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(getStoredVolume);
   const [everyonePlaying, setEveryonePlaying] = useState(Boolean(media.isPlaying));
-
   syncRef.current = onPlaybackSync;
   canControlRef.current = canControl;
   mediaRef.current = media;
@@ -78,6 +77,7 @@ const YouTubeSharedMediaPlayer = forwardRef(function YouTubeSharedMediaPlayer({ 
   useEffect(() => {
     setEveryonePlaying(Boolean(media.isPlaying));
   }, [media.isPlaying, media.updatedAt]);
+
 
   useImperativeHandle(ref, () => ({
     play: () => {
@@ -103,7 +103,9 @@ const YouTubeSharedMediaPlayer = forwardRef(function YouTubeSharedMediaPlayer({ 
         videoId: media.videoId,
         playerVars: {
           autoplay: 0,
-          controls: 1,
+          controls: 0,
+          disablekb: 1,
+          fs: 0,
           enablejsapi: 1,
           origin: window.location.origin,
           playsinline: 1,
@@ -113,6 +115,7 @@ const YouTubeSharedMediaPlayer = forwardRef(function YouTubeSharedMediaPlayer({ 
           onReady(event) {
             if (cancelled) return;
             playerRef.current = event.target;
+            event.target.getIframe?.().setAttribute("tabindex", "-1");
             setReady(true);
             event.target.setVolume(volume);
             if (locallyMuted) event.target.mute();
@@ -126,7 +129,7 @@ const YouTubeSharedMediaPlayer = forwardRef(function YouTubeSharedMediaPlayer({ 
               setPlaybackError("");
               if (!localPauseRef.current) setLocallyPaused(false);
             }
-            if (canControlRef.current && !localPlaybackActionRef.current && !remotePlaybackActionRef.current && (event.data === YT.PlayerState.PLAYING || event.data === YT.PlayerState.PAUSED || event.data === YT.PlayerState.ENDED)) {
+            if (canControlRef.current && mediaRef.current.controllerId === selfId && !localPlaybackActionRef.current && !remotePlaybackActionRef.current && event.data === YT.PlayerState.ENDED) {
               syncRef.current?.({ currentTime: event.target.getCurrentTime(), isPlaying });
             }
           },
@@ -211,11 +214,12 @@ const YouTubeSharedMediaPlayer = forwardRef(function YouTubeSharedMediaPlayer({ 
   }
 
   function seekForEveryone(event) {
+    if (!canControlRef.current) return;
     const nextTime = Number(event.target.value);
     if (!Number.isFinite(nextTime)) return;
     playerRef.current?.seekTo?.(nextTime, true);
     setCurrentTime(nextTime);
-    if (canControlRef.current) syncRef.current?.({ currentTime: nextTime, isPlaying: playerRef.current?.getPlayerState?.() === window.YT?.PlayerState?.PLAYING });
+    syncRef.current?.({ currentTime: nextTime, isPlaying: everyonePlaying });
   }
 
   function changeVolume(event) {
@@ -230,10 +234,14 @@ const YouTubeSharedMediaPlayer = forwardRef(function YouTubeSharedMediaPlayer({ 
   }
 
   function toggleEveryonePlayback() {
+    if (!canControlRef.current) return;
     const shouldPlay = !everyonePlaying;
     setEveryonePlaying(shouldPlay);
+    setLocallyPaused(false);
+    localPauseRef.current = false;
     if (shouldPlay) playerRef.current?.playVideo?.();
     else playerRef.current?.pauseVideo?.();
+    syncRef.current?.({ currentTime: playerRef.current?.getCurrentTime?.() || 0, isPlaying: shouldPlay });
   }
 
   return <div className={`shared-media-player ${media.kind === "audio" ? "is-audio" : "is-video"}`}>
@@ -242,8 +250,8 @@ const YouTubeSharedMediaPlayer = forwardRef(function YouTubeSharedMediaPlayer({ 
       <span><Volume2 size={28} /><strong>Shared YouTube Music</strong><small>Audio only</small></span>
     </div>}
     <div className="shared-media-youtube-frame" aria-hidden={media.kind === "audio"}><div ref={hostRef} /></div>
-    {media.kind === "audio" && <div className="shared-media-audio-controls">
-      <label className="shared-media-seek"><span>{formatTime(currentTime)} / {formatTime(duration)}</span><input type="range" min="0" max={Math.max(1, duration)} step="0.1" value={Math.min(currentTime, Math.max(1, duration))} onChange={seekForEveryone} disabled={!ready || !duration || !canControl} aria-label="Seek shared audio for everyone" /></label>
+    {canControl && <div className="shared-media-audio-controls">
+      <label className="shared-media-seek"><span>{formatTime(currentTime)} / {formatTime(duration)}</span><input type="range" min="0" max={Math.max(1, duration)} step="0.1" value={Math.min(currentTime, Math.max(1, duration))} onChange={seekForEveryone} disabled={!ready || !duration} aria-label={`Seek shared ${media.kind} for everyone`} /></label>
       <label className="shared-media-volume"><Volume2 size={14} /><input type="range" min="0" max="100" value={volume} onChange={changeVolume} disabled={!ready} aria-label="Volume on this device" /></label>
     </div>}
     <div className="shared-media-playback-controls" aria-label="Playback controls">
@@ -276,6 +284,7 @@ const DirectMediaPlayer = forwardRef(function DirectMediaPlayer({ media, selfId,
     setEveryonePlaying(Boolean(media.isPlaying));
   }, [media.isPlaying, media.updatedAt]);
 
+
   useImperativeHandle(ref, () => ({
     play: () => { elementRef.current?.play?.().catch(() => {}); setLocallyPaused(false); localPauseRef.current = false; },
     pause: () => { elementRef.current?.pause?.(); setLocallyPaused(true); localPauseRef.current = true; },
@@ -292,8 +301,8 @@ const DirectMediaPlayer = forwardRef(function DirectMediaPlayer({ media, selfId,
     window.setTimeout(() => { applyingRef.current = false; }, 250);
   }, [ready, media.updatedAt, media.currentTime, media.isPlaying, media.controllerId, selfId]);
 
-  const sync = (isPlaying) => {
-    if (canControl && !applyingRef.current) syncRef.current?.({ currentTime: elementRef.current?.currentTime || 0, isPlaying });
+  const syncEnded = () => {
+    if (canControl && media.controllerId === selfId && !applyingRef.current) syncRef.current?.({ currentTime: elementRef.current?.currentTime || 0, isPlaying: false });
   };
   const localPause = () => {
     const element = elementRef.current;
@@ -310,12 +319,13 @@ const DirectMediaPlayer = forwardRef(function DirectMediaPlayer({ media, selfId,
     setLocallyMuted(element.muted);
   };
   const seekForEveryone = (event) => {
+    if (!canControl) return;
     const nextTime = Number(event.target.value);
     const element = elementRef.current;
     if (!element || !Number.isFinite(nextTime)) return;
     element.currentTime = nextTime;
     setCurrentTime(nextTime);
-    if (canControl) syncRef.current?.({ currentTime: nextTime, isPlaying: !element.paused });
+    syncRef.current?.({ currentTime: nextTime, isPlaying: everyonePlaying });
   };
   const changeVolume = (event) => {
     const nextVolume = Number(event.target.value);
@@ -326,16 +336,20 @@ const DirectMediaPlayer = forwardRef(function DirectMediaPlayer({ media, selfId,
     saveStoredVolume(nextVolume);
   };
   const toggleEveryonePlayback = () => {
+    if (!canControl) return;
     const shouldPlay = !everyonePlaying;
     setEveryonePlaying(shouldPlay);
+    setLocallyPaused(false);
+    localPauseRef.current = false;
     if (shouldPlay) elementRef.current?.play?.().catch(() => {});
     else elementRef.current?.pause?.();
+    syncRef.current?.({ currentTime: elementRef.current?.currentTime || 0, isPlaying: shouldPlay });
   };
-  const sharedProps = { ref: elementRef, src: media.sourceUrl, controls: media.kind === "video", onCanPlay: () => { setReady(true); setDuration(elementRef.current?.duration || 0); elementRef.current.volume = volume / 100; setError(""); if (media.isPlaying && !localPauseRef.current) elementRef.current?.play?.().catch(() => {}); }, onTimeUpdate: () => setCurrentTime(elementRef.current?.currentTime || 0), onPlay: () => sync(true), onPause: () => sync(false), onError: () => setError("This site did not provide a browser-playable media stream."), playsInline: true };
+  const sharedProps = { ref: elementRef, src: media.sourceUrl, controls: false, onCanPlay: () => { setReady(true); setDuration(elementRef.current?.duration || 0); elementRef.current.volume = volume / 100; setError(""); if (media.isPlaying && !localPauseRef.current) elementRef.current?.play?.().catch(() => {}); }, onTimeUpdate: () => setCurrentTime(elementRef.current?.currentTime || 0), onEnded: syncEnded, onError: () => setError("This site did not provide a browser-playable media stream."), playsInline: true };
   return <div className={`shared-media-player direct-media-player ${media.kind === "audio" ? "is-audio" : "is-video"}`}>
     {media.kind === "audio" ? <audio className="shared-media-direct-audio" {...sharedProps} /> : <video className="shared-media-direct-video" {...sharedProps} />}
-    {media.kind === "audio" && <div className="shared-media-audio-controls">
-      <label className="shared-media-seek"><span>{formatTime(currentTime)} / {formatTime(duration)}</span><input type="range" min="0" max={Math.max(1, duration)} step="0.1" value={Math.min(currentTime, Math.max(1, duration))} onChange={seekForEveryone} disabled={!ready || !duration || !canControl} aria-label="Seek shared audio for everyone" /></label>
+    {canControl && <div className="shared-media-audio-controls">
+      <label className="shared-media-seek"><span>{formatTime(currentTime)} / {formatTime(duration)}</span><input type="range" min="0" max={Math.max(1, duration)} step="0.1" value={Math.min(currentTime, Math.max(1, duration))} onChange={seekForEveryone} disabled={!ready || !duration} aria-label={`Seek shared ${media.kind} for everyone`} /></label>
       <label className="shared-media-volume"><Volume2 size={14} /><input type="range" min="0" max="100" value={volume} onChange={changeVolume} disabled={!ready} aria-label="Volume on this device" /></label>
     </div>}
     <div className="shared-media-playback-controls" aria-label="Playback controls">

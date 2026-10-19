@@ -996,7 +996,8 @@ export function useGroup({ meetingType = "group" } = {}) {
     return send({ type: "group-media-stop" });
   }
   function syncMediaPlayback(state) {
-    if (roomRef.current && activeMedia?.controllerId === roomRef.current.selfId) send({ type: "group-media-playback", ...state });
+    if (!roomRef.current || !activeMedia || (!["owner", "admin"].includes(roomRef.current.self?.role) && !mediaMembersAllowed)) return false;
+    return send({ type: "group-media-playback", ...state });
   }
   function submitStudentDetails(details) {
     if (!roomRef.current || !online) return false;

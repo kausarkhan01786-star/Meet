@@ -47,6 +47,12 @@ Groups and Single meetings share the same HTTPS/STUN/TURN infrastructure. **Loca
 
 Camera verification used generated video over real WebRTC, checked decoded remote camera pixels and simultaneous screen/camera streams, permission denial, off/on, minimized continuity, late Group joining and capture cleanup. Physical webcams, mobile camera hardware, and the public TURN deployment still require real-device testing.
 
+## Shared Media
+
+Owners and admins can play, seek, pause/resume, and stop shared audio or video. **Allow members to manage media** grants the same shared controls to members; turning it off removes those controls immediately. The signaling server enforces this permission. Local mute/pause affects only the listener's device and remains available without management permission.
+
+YouTube and direct media use the app's playback controls instead of native player controls. YouTube keyboard and iframe pointer controls are disabled. YouTube may still show its title, branding, recommendations, or other provider overlays; its official embedding options do not guarantee an overlay-free player. The app does not crop or cover those overlays.
+
 ## Meeting Chat
 
 The right-side panel has Chat and People tabs. On small screens, the chat button opens an overlay drawer. Messages are limited to 2,000 characters, sent only to members of the same room, and rendered as plain text. The server assigns sender identity and limits message bursts. Chat travels over the signaling connection (TLS on HTTPS deployments); unlike WebRTC media, it is not end-to-end encrypted from the signaling server. No server-side history is stored. Each browser keeps at most 200 messages until leaving, so late joiners do not receive earlier messages. Display names are not verified identities.

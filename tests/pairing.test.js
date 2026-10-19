@@ -414,6 +414,47 @@ test("meeting create and join require at least four trimmed name characters with
   }
 });
 
+test("shared media playback follows member permission grants and revocation", async (context) => {
+  const { client, receive, send } = await setup(context);
+  const owner = await client();
+  const member = await client();
+  send(owner, { type: "group-create", name: "Owner" });
+  const created = await receive(owner);
+  send(member, { type: "group-join", code: created.code, name: "Member" });
+  const joined = await receive(member);
+  await receive(owner);
+  const allState = async (stage) => {
+    const ownerState = await receive(owner);
+    assert.equal(ownerState.type, "group-state", `${stage}: ${JSON.stringify(ownerState)}`);
+    return [ownerState, await receive(member)];
+  };
+  send(owner, { type: "group-media-play", kind: "video", title: "Shared video", videoId: "dQw4w9WgXcQ" });
+  assert.equal((await allState("start media"))[1].activeMedia.controllerId, created.selfId);
+  send(member, { type: "group-media-playback", currentTime: 10, isPlaying: false });
+  send(member, { type: "group-media-stop" });
+  assert.match((await receive(member)).message, /not allowed/);
+  send(owner, { type: "group-media-permission", enabled: true });
+  const granted = (await allState("grant permission"))[1];
+  assert.equal(granted.mediaMembersAllowed, true);
+  assert.equal(granted.activeMedia.currentTime, 0);
+  send(member, { type: "group-media-playback", currentTime: 12, isPlaying: false });
+  const paused = (await allState("member pause"))[0].activeMedia;
+  assert.equal(paused.controllerId, joined.selfId);
+  assert.equal(paused.currentTime, 12);
+  assert.equal(paused.isPlaying, false);
+  send(owner, { type: "group-media-permission", enabled: false });
+  const revoked = (await allState("revoke permission"))[1];
+  assert.equal(revoked.mediaMembersAllowed, false);
+  assert.equal(revoked.activeMedia.controllerId, created.selfId);
+  send(member, { type: "group-media-playback", currentTime: 99, isPlaying: true });
+  send(member, { type: "group-media-stop" });
+  assert.match((await receive(member)).message, /not allowed/);
+  send(owner, { type: "group-media-playback", currentTime: 13, isPlaying: true });
+  const resumed = (await allState("owner resume"))[1].activeMedia;
+  assert.equal(resumed.currentTime, 13);
+  assert.equal(resumed.isPlaying, true);
+});
+
 test("only authorized admins can manage chat, permissions, roles and removal", async (context) => {
   const { client, receive, send } = await setup(context);
   const owner = await client();
