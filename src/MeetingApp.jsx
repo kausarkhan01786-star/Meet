@@ -26,10 +26,10 @@ function DigitalClock() {
     return () => window.clearInterval(interval);
   }, []);
   const time = new Intl.DateTimeFormat(undefined, {
-    hour: "2-digit",
+    hour: "numeric",
     minute: "2-digit",
     second: "2-digit",
-    hour12: false,
+    hour12: true,
   }).format(now);
   const zone = new Intl.DateTimeFormat(undefined, {
     timeZoneName: "short",
