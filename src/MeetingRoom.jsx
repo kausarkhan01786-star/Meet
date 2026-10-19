@@ -526,18 +526,20 @@ function speakRecordingAnnouncement(name) {
   const utterance = new window.SpeechSynthesisUtterance(`${name} is recording the meeting`);
   const voices = synth.getVoices();
   const englishVoices = voices.filter((voice) => voice.lang?.toLowerCase().startsWith("en"));
-  const likelyMaleVoice = englishVoices.find((voice) =>
-    /\b(david|mark|guy|richard|ravi|james|alex|daniel|fred|george|tom|aaron|arthur|oliver|liam)\b/i.test(voice.name),
+  const maleVoiceName = /\b(andrew|brian|christopher|davis|david|eric|guy|jason|liam|mark|oliver|ravi|richard|roger|ryan|tony)\b/i;
+  const naturalMaleVoice = englishVoices.find((voice) =>
+    /natural|online|neural/i.test(voice.name) && maleVoiceName.test(voice.name),
   );
-  const selectedVoice = likelyMaleVoice || englishVoices[0];
+  const likelyMaleVoice = englishVoices.find((voice) => maleVoiceName.test(voice.name));
+  const selectedVoice = naturalMaleVoice || likelyMaleVoice || englishVoices[0];
   if (selectedVoice) {
     utterance.voice = selectedVoice;
     utterance.lang = selectedVoice.lang;
   } else {
     utterance.lang = "en-US";
   }
-  utterance.rate = 0.94;
-  utterance.pitch = 0.72;
+  utterance.rate = 0.98;
+  utterance.pitch = 1;
   utterance.volume = 1;
   synth.speak(utterance);
 }
