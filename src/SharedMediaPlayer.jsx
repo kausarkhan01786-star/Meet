@@ -3,6 +3,11 @@ import { Pause, Play, Volume2, VolumeX } from "lucide-react";
 
 let youtubeApiPromise;
 
+function formatTime(value) {
+  const seconds = Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0;
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+}
+
 function loadYouTubeApi() {
   if (window.YT?.Player) return Promise.resolve(window.YT);
   if (youtubeApiPromise) return youtubeApiPromise;
@@ -44,6 +49,9 @@ const YouTubeSharedMediaPlayer = forwardRef(function YouTubeSharedMediaPlayer({ 
   const [locallyMuted, setLocallyMuted] = useState(false);
   const [autoplayBlocked, setAutoplayBlocked] = useState(false);
   const [playbackError, setPlaybackError] = useState("");
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [volume, setVolume] = useState(100);
 
   syncRef.current = onPlaybackSync;
   canControlRef.current = canControl;
@@ -146,6 +154,19 @@ const YouTubeSharedMediaPlayer = forwardRef(function YouTubeSharedMediaPlayer({ 
     return () => window.clearInterval(timer);
   }, [ready, canControl, media.controllerId, selfId]);
 
+  useEffect(() => {
+    if (!ready) return undefined;
+    const updateProgress = () => {
+      const player = playerRef.current;
+      if (!player) return;
+      setCurrentTime(player.getCurrentTime?.() || 0);
+      setDuration(player.getDuration?.() || 0);
+    };
+    updateProgress();
+    const timer = window.setInterval(updateProgress, 500);
+    return () => window.clearInterval(timer);
+  }, [ready]);
+
   function toggleLocalPlayback() {
     localPlaybackActionRef.current = true;
     window.clearTimeout(localActionTimeoutRef.current);
@@ -168,12 +189,34 @@ const YouTubeSharedMediaPlayer = forwardRef(function YouTubeSharedMediaPlayer({ 
     setLocallyMuted((current) => !current);
   }
 
+  function seekForEveryone(event) {
+    const nextTime = Number(event.target.value);
+    if (!Number.isFinite(nextTime)) return;
+    playerRef.current?.seekTo?.(nextTime, true);
+    setCurrentTime(nextTime);
+    if (canControlRef.current) syncRef.current?.({ currentTime: nextTime, isPlaying: playerRef.current?.getPlayerState?.() === window.YT?.PlayerState?.PLAYING });
+  }
+
+  function changeVolume(event) {
+    const nextVolume = Number(event.target.value);
+    playerRef.current?.setVolume?.(nextVolume);
+    setVolume(nextVolume);
+    if (nextVolume > 0 && locallyMuted) {
+      playerRef.current?.unMute?.();
+      setLocallyMuted(false);
+    }
+  }
+
   return <div className={`shared-media-player ${media.kind === "audio" ? "is-audio" : "is-video"}`}>
     {media.kind === "audio" && <div className="shared-media-audio-artwork">
       <img src={`https://i.ytimg.com/vi/${media.videoId}/hqdefault.jpg`} alt="" />
       <span><Volume2 size={28} /><strong>Shared YouTube Music</strong><small>Audio only</small></span>
     </div>}
     <div className="shared-media-youtube-frame" aria-hidden={media.kind === "audio"}><div ref={hostRef} /></div>
+    {media.kind === "audio" && <div className="shared-media-audio-controls">
+      <label className="shared-media-seek"><span>{formatTime(currentTime)} / {formatTime(duration)}</span><input type="range" min="0" max={Math.max(1, duration)} step="0.1" value={Math.min(currentTime, Math.max(1, duration))} onChange={seekForEveryone} disabled={!ready || !duration || !canControl} aria-label="Seek shared audio for everyone" /></label>
+      <label className="shared-media-volume"><Volume2 size={14} /><input type="range" min="0" max="100" value={volume} onChange={changeVolume} disabled={!ready} aria-label="Volume on this device" /></label>
+    </div>}
     <div className="shared-media-local-controls" aria-label="Local playback controls">
       <button type="button" onClick={toggleLocalPlayback} disabled={!ready} title={locallyPaused ? "Resume on this device" : "Pause on this device"}>{locallyPaused ? <Play size={14} /> : <Pause size={14} />}{locallyPaused ? "Resume for me" : "Pause for me"}</button>
       <button type="button" onClick={toggleLocalMute} disabled={!ready} title={locallyMuted ? "Unmute on this device" : "Mute on this device"}>{locallyMuted ? <VolumeX size={14} /> : <Volume2 size={14} />}{locallyMuted ? "Unmute for me" : "Mute for me"}</button>
@@ -193,6 +236,9 @@ const DirectMediaPlayer = forwardRef(function DirectMediaPlayer({ media, selfId,
   const [locallyPaused, setLocallyPaused] = useState(false);
   const [locallyMuted, setLocallyMuted] = useState(false);
   const [error, setError] = useState("");
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [volume, setVolume] = useState(100);
   syncRef.current = onPlaybackSync;
 
   useImperativeHandle(ref, () => ({
@@ -228,9 +274,28 @@ const DirectMediaPlayer = forwardRef(function DirectMediaPlayer({ media, selfId,
     element.muted = !element.muted;
     setLocallyMuted(element.muted);
   };
-  const sharedProps = { ref: elementRef, src: media.sourceUrl, controls: media.kind === "video", onCanPlay: () => { setReady(true); setError(""); if (media.isPlaying && !localPauseRef.current) elementRef.current?.play?.().catch(() => {}); }, onPlay: () => sync(true), onPause: () => sync(false), onError: () => setError("This site did not provide a browser-playable media stream."), playsInline: true };
+  const seekForEveryone = (event) => {
+    const nextTime = Number(event.target.value);
+    const element = elementRef.current;
+    if (!element || !Number.isFinite(nextTime)) return;
+    element.currentTime = nextTime;
+    setCurrentTime(nextTime);
+    if (canControl) syncRef.current?.({ currentTime: nextTime, isPlaying: !element.paused });
+  };
+  const changeVolume = (event) => {
+    const nextVolume = Number(event.target.value);
+    const element = elementRef.current;
+    if (!element) return;
+    element.volume = nextVolume / 100;
+    setVolume(nextVolume);
+  };
+  const sharedProps = { ref: elementRef, src: media.sourceUrl, controls: media.kind === "video", onCanPlay: () => { setReady(true); setDuration(elementRef.current?.duration || 0); setError(""); if (media.isPlaying && !localPauseRef.current) elementRef.current?.play?.().catch(() => {}); }, onTimeUpdate: () => setCurrentTime(elementRef.current?.currentTime || 0), onPlay: () => sync(true), onPause: () => sync(false), onError: () => setError("This site did not provide a browser-playable media stream."), playsInline: true };
   return <div className={`shared-media-player direct-media-player ${media.kind === "audio" ? "is-audio" : "is-video"}`}>
     {media.kind === "audio" ? <audio className="shared-media-direct-audio" {...sharedProps} /> : <video className="shared-media-direct-video" {...sharedProps} />}
+    {media.kind === "audio" && <div className="shared-media-audio-controls">
+      <label className="shared-media-seek"><span>{formatTime(currentTime)} / {formatTime(duration)}</span><input type="range" min="0" max={Math.max(1, duration)} step="0.1" value={Math.min(currentTime, Math.max(1, duration))} onChange={seekForEveryone} disabled={!ready || !duration || !canControl} aria-label="Seek shared audio for everyone" /></label>
+      <label className="shared-media-volume"><Volume2 size={14} /><input type="range" min="0" max="100" value={volume} onChange={changeVolume} disabled={!ready} aria-label="Volume on this device" /></label>
+    </div>}
     <div className="shared-media-local-controls" aria-label="Local playback controls">
       <button type="button" onClick={localPause} disabled={!ready}>{locallyPaused ? <Play size={14} /> : <Pause size={14} />}{locallyPaused ? "Resume for me" : "Pause for me"}</button>
       <button type="button" onClick={localMute} disabled={!ready}>{locallyMuted ? <VolumeX size={14} /> : <Volume2 size={14} />}{locallyMuted ? "Unmute for me" : "Mute for me"}</button>
