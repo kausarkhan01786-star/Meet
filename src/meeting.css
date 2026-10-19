@@ -914,6 +914,7 @@ button:active:not(:disabled) {
   flex-direction: column;
   padding: 25px 35px max(24px, env(safe-area-inset-bottom));
   overflow-y: auto;
+  overflow-x: hidden;
 }
 .room-topline {
   display: flex;
@@ -3403,6 +3404,59 @@ button:active:not(:disabled) {
   .shared-media-item { flex-wrap: wrap; }
   .shared-media-item-thumbnail { flex-basis: 48px; width: 48px; }
   .shared-media-item-play { min-height: 28px; padding: 0 6px; }
+}
+
+/* Keep the call controls and shared-media panel inside narrow tablets and phones. */
+@media (max-width: 900px) {
+  .meeting-workspace, .meeting-workspace-body, .meeting-main, .meeting-stage { max-width: 100%; overflow-x: hidden; }
+  .meeting-stage.has-media-dock .shared-media-dock {
+    position: absolute;
+    z-index: 8;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: min(330px, calc(100% - 52px));
+    box-shadow: 10px 0 30px #05040a99;
+  }
+  .is-in-call .call-bottom-bar {
+    min-height: auto;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    padding: 9px 0;
+  }
+  .is-in-call .call-controls {
+    min-width: 0;
+    flex: 1 1 auto;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 5px;
+  }
+  .is-in-call .call-bottom-info, .is-in-call .call-bottom-panels {
+    flex: 0 0 auto;
+    margin: 0;
+  }
+  .is-in-call .call-bottom-panels { width: auto; }
+}
+@media (max-width: 760px) {
+  .is-in-call .call-bottom-info {
+    display: flex;
+    order: 2;
+    width: auto;
+  }
+  .is-in-call .call-bottom-info > :not(.shared-media-toggle) { display: none; }
+  .is-in-call .call-bottom-panels { order: 3; }
+  .is-in-call .call-controls { order: 1; flex: 1 1 100%; }
+  .is-in-call .call-control.share-control { padding: 0 10px; }
+  .is-in-call .call-control.share-control span { display: none; }
+  .is-in-call .controls-divider { display: none; }
+}
+@media (max-width: 460px) {
+  .is-in-call .call-controls { gap: 4px; }
+  .is-in-call .call-control { min-width: 35px; height: 38px; padding: 0 7px; }
+  .is-in-call .call-control.hang-up { min-width: 42px; }
+  .is-in-call .call-bottom-panels .rescue-mode-control { min-width: 30px; width: 30px; padding: 0; }
+  .is-in-call .call-bottom-panels .rescue-mode-control span { display: none; }
 }
 .call-bottom-panels .rescue-mode-control {
   display: inline-flex;
