@@ -3365,6 +3365,7 @@ button:active:not(:disabled) {
 .shared-media-kind-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 4px; border: 1px solid #382b40; border-radius: 6px; background: #19141e; }
 .shared-media-kind-switch-three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .shared-media-kind-switch button { display: inline-flex; justify-content: center; align-items: center; gap: 6px; min-height: 34px; border-radius: 4px; background: transparent; color: #ad9ab8; font-size: 11px; }
+.shared-media-kind-switch-three button { min-height: 42px; }
 .shared-media-kind-switch button[aria-selected="true"] { background: #382945; color: #f0e4f7; }
 .shared-media-search { display: grid; gap: 6px; color: #bcacc7; font-size: 10px; }
 .shared-media-search > div { display: flex; gap: 5px; }
@@ -3458,7 +3459,7 @@ button:active:not(:disabled) {
   .shared-media-item { flex-wrap: wrap; }
   .shared-media-item-thumbnail { flex-basis: 48px; width: 48px; }
   .shared-media-item-play { min-height: 28px; padding: 0 6px; }
-  .shared-media-kind-switch-three button { min-height: 37px; font-size: 10px; }
+  .shared-media-kind-switch-three button { min-height: 42px; font-size: 10px; }
 }
 
 /* Keep the call controls and shared-media panel inside narrow tablets and phones. */
