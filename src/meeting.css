@@ -2863,6 +2863,22 @@ button:active:not(:disabled) {
   max-height: none;
   aspect-ratio: auto;
 }
+@media (min-width: 761px) {
+  .camera-grid,
+  .camera-grid.is-single,
+  .camera-grid.is-double {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-content: safe center;
+  }
+  .camera-grid .camera-tile {
+    flex: 0 1 clamp(180px, 22%, 260px);
+    max-width: 100%;
+    height: auto;
+    aspect-ratio: 1;
+  }
+}
 .camera-tile {
   position: relative;
   aspect-ratio: auto;
