@@ -1090,7 +1090,6 @@ export default function MeetingRoom({
         className={`meeting-workspace ${chatOpen ? "has-sidebar" : ""} ${group.room ? "is-in-call" : ""}`}
         hidden={minimized}
       >
-        <MeetingReactions reactions={group.reactions} />
         <header className="meeting-header">
           <button
             className="workspace-brand"
@@ -1447,6 +1446,7 @@ export default function MeetingRoom({
               >
                 {mediaPanelOpen && <div className="shared-media-dock"><SharedMediaPanel group={group} onClose={() => setMediaPanelOpen(false)} /></div>}
                 <div className="meeting-stage-content">
+                <MeetingReactions reactions={group.reactions} />
                 {group.activeMedia ? (
                   <div className={`shared-media-stage is-${group.activeMedia.kind}`}>
                     {group.activeMedia.kind === "audio" && <div className="shared-media-stage-title"><AudioLines size={25} /><div><strong>{group.activeMedia.title}</strong><small>Shared audio is playing for everyone</small></div></div>}

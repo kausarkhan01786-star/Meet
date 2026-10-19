@@ -102,5 +102,5 @@ export function ReactionControls({ group }) {
 }
 
 export function MeetingReactions({ reactions }) {
-  return <div className="meeting-reaction-feed" aria-live="polite" aria-label="Meeting reactions">{reactions.map((item) => { const reaction = REACTIONS.find((entry) => entry.id === item.reaction); return reaction ? <div key={item.id} className="meeting-reaction-event"><span role="img" aria-label={reaction.label}>{reaction.emoji}</span><strong>{item.name}</strong></div> : null; })}</div>;
+  return <div className="meeting-reaction-feed" aria-live="polite" aria-label="Meeting reactions">{reactions.map((item, index) => { const reaction = REACTIONS.find((entry) => entry.id === item.reaction); return reaction ? <div key={item.id} className="meeting-reaction-event" style={{ "--reaction-lane": index % 5 }}><span role="img" aria-label={reaction.label}>{reaction.emoji}</span><strong>{item.name}</strong></div> : null; })}</div>;
 }

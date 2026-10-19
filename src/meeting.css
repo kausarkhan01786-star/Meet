@@ -3321,6 +3321,10 @@ button:active:not(:disabled) {
 .reaction-control-wrap { position: relative; }
 .meeting-reaction-picker { position: absolute; z-index: 25; bottom: 52px; left: 50%; transform: translateX(-50%); display: flex; gap: 4px; padding: 7px; border: 1px solid #46364f; border-radius: 24px; background: #1b1720; box-shadow: 0 8px 24px #0008; }
 .meeting-reaction-picker button { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: transparent; font-size: 19px; }
+@media (max-width: 900px) {
+  .meeting-reaction-picker { left: 0; transform: none; width: max-content; max-width: calc(100vw - 32px); flex-wrap: wrap; }
+  .meeting-reaction-picker button { flex: 0 0 34px; }
+}
 
 /* Viewport and scroll safeguards for compact phones, tablets, and desktop windows. */
 .meeting-workspace {
@@ -3391,10 +3395,10 @@ button:active:not(:disabled) {
 }
 .meeting-reaction-picker button:hover { background: #382b42; }
 .call-control.hand-is-raised { color: #f2ce75; border-color: #9c7a37; background: #3b3020; }
-.meeting-reaction-feed { position: absolute; z-index: 12; top: 78px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 6px; pointer-events: none; }
-.meeting-reaction-event { display: flex; align-items: center; gap: 7px; padding: 7px 12px; border: 1px solid #ffffff18; border-radius: 20px; background: #17131dcc; box-shadow: 0 4px 15px #0005; animation: reaction-pop 4.5s ease both; }
-.meeting-reaction-event span { font-size: 21px; }.meeting-reaction-event strong { color: #e7d8ed; font-size: 10px; }
-@keyframes reaction-pop { 0% { opacity: 0; transform: translateY(12px) scale(.8); } 12%,78% { opacity: 1; transform: translateY(0) scale(1); } 100% { opacity: 0; transform: translateY(-15px) scale(.95); } }
+.meeting-reaction-feed { position: absolute; z-index: 12; inset: 0; overflow: hidden; container-type: size; pointer-events: none; }
+.meeting-reaction-event { position: absolute; bottom: 12px; left: calc(4% + var(--reaction-lane, 0) * 14%); display: flex; align-items: center; gap: 7px; max-width: 36%; padding: 7px 10px; border: 1px solid #ffffff18; border-radius: 20px; background: #17131dcc; box-shadow: 0 4px 15px #0005; animation: reaction-float 4.5s linear both; }
+.meeting-reaction-event span { flex: 0 0 auto; font-size: 26px; }.meeting-reaction-event strong { min-width: 0; overflow: hidden; color: #e7d8ed; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+@keyframes reaction-float { 0% { opacity: 0; transform: translateY(12px) scale(.8); } 10%,75% { opacity: 1; } 100% { opacity: 0; transform: translateY(calc(-100cqh + 64px)) scale(1.1); } }
 .shared-media-permission-setting { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin: 0; padding: 8px 10px; border: 1px solid #493752; border-radius: 6px; background: #201a26; }
 .shared-media-permission-setting > span { display: grid; gap: 4px; }
 .shared-media-permission-setting strong { color: #e8ddef; font-size: 11px; }
@@ -3404,7 +3408,7 @@ button:active:not(:disabled) {
 .shared-media-panel > * { flex-shrink: 0; }
 .meeting-stage.has-media-dock { display: flex; align-items: stretch; }
 .shared-media-dock { display: flex; flex: 0 0 310px; width: 310px; min-width: 0; border-right: 1px solid #392d42; background: #15111a; }
-.meeting-stage-content { display: flex; flex: 1; width: 100%; height: 100%; min-width: 0; min-height: 0; }
+.meeting-stage-content { position: relative; display: flex; flex: 1; width: 100%; height: 100%; min-width: 0; min-height: 0; }
 .meeting-stage-content > .camera-grid, .meeting-stage-content > .meeting-screens, .meeting-stage-content > .shared-media-stage { width: 100%; min-width: 0; }
 .call-bottom-info .shared-media-toggle { display: grid; flex: 0 0 30px; place-items: center; width: 30px; height: 30px; border: 1px solid #493752; border-radius: 5px; background: #211a29; color: #cbb3d8; }
 .call-bottom-info .shared-media-toggle:hover:not(:disabled), .call-bottom-info .shared-media-toggle.is-active { background: #382945; color: #f0e4f7; }
