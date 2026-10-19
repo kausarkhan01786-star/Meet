@@ -3731,7 +3731,6 @@ body {
   box-shadow: inset 0 1px #ffffff18, 0 10px 28px #05030a60;
 }
 .add-meeting-button,
-.choice-action,
 .student-submit-button,
 .recording-download,
 .speaking-current button,
@@ -3746,7 +3745,6 @@ body {
   font-weight: 650;
 }
 .add-meeting-button:hover,
-.choice-action:hover,
 .student-submit-button:hover:not(:disabled),
 .recording-download:hover:not(:disabled),
 .speaking-current button:hover,
@@ -3772,7 +3770,7 @@ body {
   box-shadow: inset 0 1px #ffffff13, 0 14px 34px #05030a55;
 }
 .entry-choice:hover,
-.join-choice:hover {
+.meeting-choice:hover {
   border-color: #b68bd0;
   background: linear-gradient(145deg, #34243f, #1c1523);
   box-shadow: inset 0 1px #ffffff1d, 0 16px 32px #08040d66;
