@@ -225,7 +225,7 @@ async function encodeProfileImage(file) {
   throw new Error("Could not shrink that image enough. Try a different picture.");
 }
 
-function ProfileImagePicker({ profileImage, name, onSelect, onRemove, disabled, error }) {
+function ProfileImagePicker({ profileImage, name, onSelect, onRemove, disabled, error, hideHelp = false }) {
   return (
     <div className="profile-image-picker">
       <span className="profile-image-label">PROFILE IMAGE <small>OPTIONAL</small></span>
@@ -234,7 +234,7 @@ function ProfileImagePicker({ profileImage, name, onSelect, onRemove, disabled, 
         <label className={`profile-image-upload ${disabled ? "is-disabled" : ""}`}>{profileImage ? "Change image" : "Upload image"}<input type="file" accept="image/*" disabled={disabled} onChange={onSelect} /></label>
         {profileImage && <button type="button" className="profile-image-remove" disabled={disabled} onClick={onRemove}>Remove</button>}
       </div>
-      <small className="profile-image-help">Optional. Meeting participants can see it; image is resized before sharing.</small>
+      {!hideHelp && <small className="profile-image-help">Optional. Meeting participants can see it; image is resized before sharing.</small>}
       {error && <small className="profile-image-error" role="alert">{error}</small>}
     </div>
   );
@@ -244,6 +244,7 @@ function SharedMediaPanel({ group, onClose }) {
   const [kind, setKind] = useState("audio");
   const [query, setQuery] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   const [results, setResults] = useState([]);
   const [pageToken, setPageToken] = useState("");
   const [discoveryIndex, setDiscoveryIndex] = useState(0);
@@ -337,7 +338,46 @@ function SharedMediaPanel({ group, onClose }) {
       </article>}
       {!directResult && !directState.loading && !directState.error && <p className="shared-media-note">Paste any embeddable YouTube or YouTube Music link to find it.</p>}
     </> : <>
-    <form className="shared-media-search" onSubmit={(event) => { event.preventDefault(); setPageToken(""); setSearchQuery(query.trim()); }}><label htmlFor="shared-media-search-input">Search {kind === "audio" ? "YouTube Music" : "YouTube videos"}</label><div><input id="shared-media-search-input" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={kind === "audio" ? "Search songs or artists" : "Search videos"} /><button type="submit" aria-label="Search YouTube"><Search size={15} /></button></div></form>
+    <form className="shared-media-search" onSubmit={(event) => { event.preventDefault(); setPageToken(""); setSearchQuery(query.trim()); setSuggestionsOpen(false); }}>
+      <label htmlFor="shared-media-search-input">Search {kind === "audio" ? "YouTube Music" : "YouTube videos"}</label>
+      <div>
+        <input
+          id="shared-media-search-input"
+          type="search"
+          value={query}
+          onChange={(event) => {
+            const value = event.target.value;
+            setQuery(value);
+            setSearchQuery(value.trim());
+            setPageToken("");
+            setSuggestionsOpen(Boolean(value.trim()));
+          }}
+          onFocus={() => setSuggestionsOpen(Boolean(query.trim()))}
+          onBlur={() => setSuggestionsOpen(false)}
+          aria-autocomplete="list"
+          aria-expanded={Boolean(suggestionsOpen && query.trim() && results.length && !searchState.loading)}
+          aria-controls="shared-media-suggestions"
+          placeholder={kind === "audio" ? "Search songs or artists" : "Search videos"}
+        />
+        <button type="submit" aria-label="Search YouTube"><Search size={15} /></button>
+      </div>
+      {suggestionsOpen && query.trim() && !searchState.loading && results.length > 0 && <div className="shared-media-suggestions" id="shared-media-suggestions" role="listbox" aria-label="Search suggestions">
+        {results.slice(0, 6).map((item) => <button
+          type="button"
+          role="option"
+          aria-selected="false"
+          className="shared-media-suggestion"
+          key={item.videoId}
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => {
+            setSuggestionsOpen(false);
+            play(item);
+          }}
+        >
+          <span>{item.title}</span>
+        </button>)}
+      </div>}
+    </form>
     <div className="shared-media-playlist-heading"><strong>{kind === "audio" ? "Audio playlist" : "Video playlist"}<small>{searchQuery ? "Search results" : "Popular picks"}</small></strong><span className="shared-media-playlist-tools"><button type="button" className={searchState.loading ? "is-spinning" : ""} onClick={refreshPlaylist} disabled={searchState.loading} aria-label="Refresh playlist" title="Show a new playlist"><RotateCw size={13} /></button><span>{results.length}</span></span></div>
     <div className="shared-media-playlist">
       {searchState.loading && !results.length && <div className="shared-media-loading-list" aria-label={`Loading ${kind === "audio" ? "music" : "videos"}`}>
@@ -746,7 +786,6 @@ export default function MeetingRoom({
   const [needsReconnect, setNeedsReconnect] = useState(
     Boolean(initialSession.roomCode),
   );
-  const [autoEnter, setAutoEnter] = useState(!initialSession.mode || initialSession.joinFromShare === true);
   const [copied, setCopied] = useState(false);
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
@@ -763,8 +802,6 @@ export default function MeetingRoom({
   const [recordingMessage, setRecordingMessage] = useState("");
   const [savedRecording, setSavedRecording] = useState(null);
   const announcedRecordingId = useRef(null);
-  const attemptedCode = useRef("");
-  const creating = useRef(false);
   const copyTimer = useRef(null);
   const seenMessageIds = useRef(new Set());
   const messageRoomId = useRef(null);
@@ -943,42 +980,6 @@ export default function MeetingRoom({
     };
   }, [minimized, previewStream]);
   useEffect(() => {
-    if (!autoEnter || needsReconnect || profileImageBusy) return;
-    if (
-      mode === "create" &&
-      isValidMeetingName(name) &&
-      group.online &&
-      !group.room &&
-      !creating.current
-    ) {
-      creating.current = true;
-      group.enter("create", name.trim(), "", profileImage);
-    }
-    if (
-      mode === "join" &&
-      isValidMeetingName(name) &&
-      group.online &&
-      code.length === 6 &&
-      !group.room &&
-      !group.joining &&
-      attemptedCode.current !== code
-    ) {
-      attemptedCode.current = code;
-      group.enter("join", name.trim(), code, profileImage);
-    }
-  }, [
-    mode,
-    code,
-    group.online,
-    group.room,
-    group.joining,
-    name,
-    autoEnter,
-    needsReconnect,
-    profileImage,
-    profileImageBusy,
-  ]);
-  useEffect(() => {
     if (!group.room) {
       joinedAt.current = 0;
       setElapsed(0);
@@ -1028,12 +1029,9 @@ export default function MeetingRoom({
   function leave() {
     group.leave();
     setNeedsReconnect(false);
-    setAutoEnter(true);
     savedRoomCode.current = "";
     setMode(null);
     setCode("");
-    creating.current = false;
-    attemptedCode.current = "";
   }
   function home() {
     if (group.room && onMinimize) {
@@ -1230,8 +1228,6 @@ export default function MeetingRoom({
                     className="entry-choice"
                     disabled={!isValidMeetingName(name) || profileImageBusy}
                     onClick={() => {
-                      creating.current = false;
-                      setAutoEnter(false);
                       setMode("create");
                     }}
                   >
@@ -1255,10 +1251,7 @@ export default function MeetingRoom({
                   <button
                     className="entry-choice receive-entry"
                     disabled={!isValidMeetingName(name) || profileImageBusy}
-                    onClick={() => {
-                      setAutoEnter(true);
-                      setMode("join");
-                    }}
+                    onClick={() => setMode("join")}
                   >
                     <span className="entry-choice-icon">
                       <LogIn size={25} strokeWidth={1.3} />
@@ -1299,11 +1292,9 @@ export default function MeetingRoom({
                       disabled={!group.online || !isValidMeetingName(name) || group.joining}
                       onClick={() => {
                         const previousCode = savedRoomCode.current;
-                        attemptedCode.current = previousCode;
                         setMode("join");
                         setCode(previousCode);
                         setNeedsReconnect(false);
-                        setAutoEnter(true);
                         group.enter("join", name.trim(), previousCode, profileImage);
                       }}
                     >
@@ -1324,112 +1315,113 @@ export default function MeetingRoom({
                       group.enter("join", name.trim(), code, profileImage);
                     }}
                   >
-                    <div className="receive-call-symbol">
-                      <LogIn size={31} strokeWidth={1.2} />
+                    <div className="join-form-content">
+                      <div className="receive-call-symbol">
+                        <LogIn size={31} strokeWidth={1.2} />
+                      </div>
+                      <h2>
+                        {group.admissionStatus === "pending"
+                          ? "Waiting for rejoin approval."
+                          : single
+                          ? "You're six digits away."
+                          : "Join your meeting."}
+                      </h2>
+                      {group.admissionStatus === "pending" && <p className="admission-waiting-note" role="status">The Owner or an Admin will review your request. Please keep this page open.</p>}
+                      <label htmlFor="join-display-name">
+                        YOUR NAME <span>REQUIRED</span>
+                      </label>
+                      <input
+                        id="join-display-name"
+                        className="name-input"
+                        placeholder="Name (min. 4 characters)"
+                        pattern={"[^\\p{N}]*"}
+                        title="At least 4 characters, no numbers"
+                        minLength={4}
+                        maxLength={40}
+                        autoComplete="nickname"
+                        required
+                        autoFocus
+                        value={name}
+                        disabled={group.joining || group.admissionStatus === "pending"}
+                        onChange={(event) => setName(event.target.value.replace(/\p{N}/gu, ""))}
+                      />
+                      <ProfileImagePicker profileImage={profileImage} name={name} disabled={group.joining || group.admissionStatus === "pending" || profileImageBusy} error={profileImageBusy ? "Processing image..." : profileImageError} onSelect={selectProfileImage} onRemove={removeProfileImage} hideHelp />
+                      <div className="join-code-field">
+                        <label htmlFor="meeting-code">6D CODE</label>
+                        <input
+                          id="meeting-code"
+                          inputMode="numeric"
+                          autoComplete="off"
+                          maxLength={6}
+                          pattern="[0-9]{6}"
+                          placeholder="000000"
+                          value={code}
+                          disabled={group.joining || group.admissionStatus === "pending"}
+                          required
+                          onChange={(event) => {
+                            setCode(
+                              event.target.value.replace(/\D/g, "").slice(0, 6),
+                            );
+                          }}
+                        />
+                      </div>
+                      <button
+                        className="connect-call-button"
+                        disabled={
+                          !group.online ||
+                          group.joining ||
+                          group.admissionStatus === "pending" ||
+                          profileImageBusy ||
+                          !isValidMeetingName(name) ||
+                          code.length !== 6
+                        }
+                      >
+                        {group.joining ? (
+                          <LoaderCircle className="spin" size={16} />
+                        ) : (
+                          <ArrowRight size={16} />
+                        )}
+                        {group.joining ? "Connecting..." : group.admissionStatus === "pending" ? "Waiting for approval" : "Connect"}
+                      </button>
+                      <span className="join-secure">
+                        <LockKeyhole size={12} /> The code stays between your
+                        people.
+                      </span>
                     </div>
-                    <h2>
-                      {group.admissionStatus === "pending"
-                        ? "Waiting for rejoin approval."
-                        : single
-                        ? "You're six digits away."
-                        : "Join your meeting."}
-                    </h2>
-                    {group.admissionStatus === "pending" && <p className="admission-waiting-note" role="status">The Owner or an Admin will review your request. Please keep this page open.</p>}
-                    <label htmlFor="join-display-name">
-                      YOUR NAME <span>REQUIRED</span>
-                    </label>
-                    <input
-                      id="join-display-name"
-                      className="name-input"
-                      placeholder="Name (min. 4 characters)"
-                      pattern={"[^\\p{N}]*"}
-                      title="At least 4 characters, no numbers"
-                      minLength={4}
-                      maxLength={40}
-                      autoComplete="nickname"
-                      required
-                      autoFocus
-                      value={name}
-                      disabled={group.joining || group.admissionStatus === "pending"}
-                      onChange={(event) => setName(event.target.value.replace(/\p{N}/gu, ""))}
-                    />
-                    <ProfileImagePicker profileImage={profileImage} name={name} disabled={group.joining || group.admissionStatus === "pending" || profileImageBusy} error={profileImageBusy ? "Processing image..." : profileImageError} onSelect={selectProfileImage} onRemove={removeProfileImage} />
-                    <label htmlFor="meeting-code">
-                      {single ? "PAIRING CODE" : "MEETING CODE"}
-                    </label>
-                    <input
-                      id="meeting-code"
-                      inputMode="numeric"
-                      autoComplete="off"
-                      maxLength={6}
-                      pattern="[0-9]{6}"
-                      placeholder="000000"
-                      value={code}
-                      disabled={group.joining || group.admissionStatus === "pending"}
-                      required
-                      onChange={(event) => {
-                        setAutoEnter(true);
-                        setCode(
-                          event.target.value.replace(/\D/g, "").slice(0, 6),
-                        );
-                      }}
-                    />
-                    <p className="location-sharing-note">Your browser will ask to share your location. Meeting admins can view it on a map.</p>
-                    <button
-                      className="connect-call-button"
-                      disabled={
-                        !group.online ||
-                        group.joining ||
-                        group.admissionStatus === "pending" ||
-                        profileImageBusy ||
-                        !isValidMeetingName(name) ||
-                        code.length !== 6
-                      }
-                    >
-                      {group.joining ? (
-                        <LoaderCircle className="spin" size={16} />
-                      ) : (
-                        <ArrowRight size={16} />
-                      )}
-                      {group.joining ? "Connecting..." : group.admissionStatus === "pending" ? "Waiting for approval" : "Connect"}
-                    </button>
-                    <span className="join-secure">
-                      <LockKeyhole size={12} /> The code stays between your
-                      people.
-                    </span>
                   </form>
                 ) : (
                   <form
-                    className="receive-call-form"
+                    className="receive-call-form create-meeting-form"
                     onSubmit={(event) => {
                       event.preventDefault();
                       group.enter("create", name.trim(), "", profileImage);
                     }}
                   >
-                    <div className="receive-call-symbol">
-                      <Plus size={31} strokeWidth={1.2} />
+                    <div className="join-form-content">
+                      <div className="receive-call-symbol">
+                        <Plus size={31} strokeWidth={1.2} />
+                      </div>
+                      <h2>Create a new meeting.</h2>
+                      <label htmlFor="create-display-name">
+                        YOUR NAME <span>REQUIRED</span>
+                      </label>
+                      <input
+                        id="create-display-name"
+                        className="name-input"
+                        placeholder="Name (min. 4 characters)"
+                        pattern={"[^\\p{N}]*"}
+                        title="At least 4 characters, no numbers"
+                        minLength={4}
+                        maxLength={40}
+                        autoComplete="nickname"
+                        required
+                        autoFocus
+                        value={name}
+                        disabled={group.joining}
+                        onChange={(event) => setName(event.target.value.replace(/\p{N}/gu, ""))}
+                      />
+                      <ProfileImagePicker profileImage={profileImage} name={name} disabled={group.joining || profileImageBusy} error={profileImageBusy ? "Processing image..." : profileImageError} onSelect={selectProfileImage} onRemove={removeProfileImage} hideHelp />
                     </div>
-                    <h2>Create a new meeting.</h2>
-                    <label htmlFor="create-display-name">
-                      YOUR NAME <span>REQUIRED</span>
-                    </label>
-                    <input
-                      id="create-display-name"
-                      className="name-input"
-                      placeholder="Name (min. 4 characters)"
-                      pattern={"[^\\p{N}]*"}
-                      title="At least 4 characters, no numbers"
-                      minLength={4}
-                      maxLength={40}
-                      autoComplete="nickname"
-                      required
-                      autoFocus
-                      value={name}
-                      disabled={group.joining}
-                      onChange={(event) => setName(event.target.value.replace(/\p{N}/gu, ""))}
-                    />
-                    <ProfileImagePicker profileImage={profileImage} name={name} disabled={group.joining || profileImageBusy} error={profileImageBusy ? "Processing image..." : profileImageError} onSelect={selectProfileImage} onRemove={removeProfileImage} />
-                    <p className="location-sharing-note">Your browser will ask to share your location. Meeting admins can view it on a map.</p>
                     <button
                       className="connect-call-button"
                       disabled={
