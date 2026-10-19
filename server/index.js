@@ -40,6 +40,22 @@ app.get("/api/rtc-config", (request, response) => {
   response.set("Cache-Control", "no-store");
   response.json(getRtcConfig());
 });
+function getYouTubeVideoId(value) {
+  if (typeof value !== "string" || value.length > 1_000) return "";
+  try {
+    const url = new URL(value.trim());
+    const host = url.hostname.toLowerCase().replace(/^www\./, "");
+    let id = "";
+    if (host === "youtu.be") id = url.pathname.split("/").filter(Boolean)[0] || "";
+    else if (host === "youtube.com" || host === "m.youtube.com" || host === "music.youtube.com") {
+      if (url.pathname === "/watch") id = url.searchParams.get("v") || "";
+      else if (/^\/(embed|shorts|live)\//.test(url.pathname)) id = url.pathname.split("/")[2] || "";
+    }
+    return /^[\w-]{11}$/.test(id) ? id : "";
+  } catch {
+    return "";
+  }
+}
 app.get("/api/media/search", async (request, response) => {
   const kind = request.query.kind === "audio" ? "audio" : request.query.kind === "video" ? "video" : "";
   const query = typeof request.query.q === "string" ? request.query.q.trim().slice(0, 100) : "";
@@ -67,6 +83,30 @@ app.get("/api/media/search", async (request, response) => {
     return response.json(payload);
   } catch {
     return response.status(502).json({ error: "Could not reach YouTube search right now." });
+  }
+});
+app.get("/api/media/lookup", async (request, response) => {
+  const videoId = getYouTubeVideoId(request.query.url);
+  const apiKey = process.env.YOUTUBE_API_KEY?.trim();
+  if (!videoId) return response.status(400).json({ error: "Paste a valid YouTube or YouTube Music link." });
+  if (!apiKey) return response.status(503).json({ error: "YouTube search is not configured. Add YOUTUBE_API_KEY to the server environment." });
+  const cacheKey = `lookup:${videoId}`;
+  const cached = mediaSearchCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return response.json(cached.item);
+  try {
+    const params = new URLSearchParams({ key: apiKey, part: "snippet,status", id: videoId });
+    const result = await fetch(`https://www.googleapis.com/youtube/v3/videos?${params}`);
+    const data = await result.json();
+    if (!result.ok) return response.status(502).json({ error: data.error?.message || "YouTube lookup failed." });
+    const video = data.items?.[0];
+    if (!video) return response.status(404).json({ error: "This YouTube item was not found." });
+    if (!video.status?.embeddable) return response.status(400).json({ error: "This YouTube item cannot be played inside a meeting." });
+    const item = { videoId, title: video.snippet?.title || "Untitled media", channel: video.snippet?.channelTitle || "YouTube", thumbnail: video.snippet?.thumbnails?.medium?.url || video.snippet?.thumbnails?.default?.url || "", suggestedKind: video.snippet?.categoryId === "10" ? "audio" : "video" };
+    mediaSearchCache.set(cacheKey, { item, expiresAt: Date.now() + 5 * 60_000 });
+    while (mediaSearchCache.size > 100) mediaSearchCache.delete(mediaSearchCache.keys().next().value);
+    return response.json(item);
+  } catch {
+    return response.status(502).json({ error: "Could not reach YouTube right now." });
   }
 });
 app.get("/api/network", (request, response) => {

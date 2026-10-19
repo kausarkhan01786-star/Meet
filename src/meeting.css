@@ -3363,6 +3363,7 @@ button:active:not(:disabled) {
 .shared-media-panel-heading h3 { margin: 0; font-size: 15px; }
 .shared-media-panel-heading p { margin: 4px 0 0; color: #a994b4; font-size: 10px; line-height: 1.5; }
 .shared-media-kind-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 4px; border: 1px solid #382b40; border-radius: 6px; background: #19141e; }
+.shared-media-kind-switch-three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .shared-media-kind-switch button { display: inline-flex; justify-content: center; align-items: center; gap: 6px; min-height: 34px; border-radius: 4px; background: transparent; color: #ad9ab8; font-size: 11px; }
 .shared-media-kind-switch button[aria-selected="true"] { background: #382945; color: #f0e4f7; }
 .shared-media-search { display: grid; gap: 6px; color: #bcacc7; font-size: 10px; }
@@ -3394,6 +3395,11 @@ button:active:not(:disabled) {
 .shared-media-item-details strong { overflow: hidden; color: #e7dced; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .shared-media-item-details small { color: #9c8aa6; font-size: 8px; }
 .shared-media-item-play { flex: 0 0 auto; min-height: 28px; padding: 0 7px; }
+.shared-media-direct-result { display: grid; grid-template-columns: 54px minmax(0, 1fr); gap: 9px; padding: 9px; border: 1px solid #604a6d; border-radius: 6px; background: #211a29; }
+.shared-media-direct-actions { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.shared-media-direct-actions > div { display: inline-flex; overflow: hidden; border: 1px solid #594565; border-radius: 4px; }
+.shared-media-direct-actions > div button { display: inline-flex; align-items: center; gap: 4px; min-height: 29px; padding: 0 7px; border: 0; border-radius: 0; background: #211a29; color: #bda8c9; font-size: 9px; }
+.shared-media-direct-actions > div button.is-selected { background: #4a3458; color: #f1e5f7; }
 .shared-media-note { margin: 0; color: #9c8aa6; font-size: 9px; line-height: 1.5; }
 .shared-media-stop-sticky { position: sticky; z-index: 2; bottom: 0; margin: auto -16px -16px; padding: 12px 16px max(12px, env(safe-area-inset-bottom)); border-top: 1px solid #493752; background: #17131e; box-shadow: 0 -8px 20px #17131eee; }
 .shared-media-stop-sticky button { width: 100%; min-height: 35px; border: 1px solid #9f5968; border-radius: 5px; background: #4a2831; color: #ffdce2; font-size: 10px; }
@@ -3433,6 +3439,7 @@ button:active:not(:disabled) {
   .shared-media-item { flex-wrap: wrap; }
   .shared-media-item-thumbnail { flex-basis: 48px; width: 48px; }
   .shared-media-item-play { min-height: 28px; padding: 0 6px; }
+  .shared-media-kind-switch-three button { min-height: 37px; font-size: 10px; }
 }
 
 /* Keep the call controls and shared-media panel inside narrow tablets and phones. */

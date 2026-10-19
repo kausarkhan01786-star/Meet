@@ -15,6 +15,7 @@ import {
   Headphones,
   Hand,
   LoaderCircle,
+  Link2,
   LockKeyhole,
   LogIn,
   MessageSquare,
@@ -245,9 +246,13 @@ function SharedMediaPanel({ group, onClose }) {
   const [pageToken, setPageToken] = useState("");
   const [nextPageToken, setNextPageToken] = useState("");
   const [searchState, setSearchState] = useState({ loading: false, error: "" });
+  const [directLink, setDirectLink] = useState("");
+  const [directResult, setDirectResult] = useState(null);
+  const [directKind, setDirectKind] = useState("video");
+  const [directState, setDirectState] = useState({ loading: false, error: "" });
   const activeItem = group.activeMedia;
   useEffect(() => {
-    if (!group.room || !group.online) return undefined;
+    if (!group.room || !group.online || !["audio", "video"].includes(kind)) return undefined;
     const controller = new AbortController();
     const search = async () => {
       setSearchState({ loading: true, error: "" });
@@ -277,13 +282,38 @@ function SharedMediaPanel({ group, onClose }) {
   function loadMore() {
     if (!searchState.loading && nextPageToken) setPageToken(nextPageToken);
   }
+  async function findDirectLink() {
+    setDirectState({ loading: true, error: "" });
+    setDirectResult(null);
+    try {
+      const response = await fetch(`/api/media/lookup?url=${encodeURIComponent(directLink.trim())}`);
+      const item = await response.json();
+      if (!response.ok) throw new Error(item.error || "Could not find this link.");
+      setDirectResult(item);
+      setDirectKind(item.suggestedKind === "audio" ? "audio" : "video");
+      setDirectState({ loading: false, error: "" });
+    } catch (error) {
+      setDirectState({ loading: false, error: error.message || "Could not find this link." });
+    }
+  }
   return <div className="shared-media-panel">
     <div className="shared-media-panel-heading"><div><h3>Shared media</h3><p>Browse YouTube Music or YouTube and play together.</p></div><button type="button" className="m-icon" onClick={onClose} aria-label="Close shared media"><X size={15} /></button></div>
     {group.isAdmin && <label className="shared-media-permission-setting"><span><strong>Allow members to manage media</strong><small>Let members play audio and videos for everyone.</small></span><input type="checkbox" checked={group.mediaMembersAllowed} onChange={(event) => group.setMediaPermission(event.target.checked)} /></label>}
-    <div className="shared-media-kind-switch" role="tablist" aria-label="Shared media type">
+    <div className="shared-media-kind-switch shared-media-kind-switch-three" role="tablist" aria-label="Shared media type">
       <button type="button" role="tab" aria-selected={kind === "audio"} onClick={() => { setKind("audio"); setQuery(""); setSearchQuery(""); setPageToken(""); setResults([]); }}><AudioLines size={14} /> Audio</button>
       <button type="button" role="tab" aria-selected={kind === "video"} onClick={() => { setKind("video"); setQuery(""); setSearchQuery(""); setPageToken(""); setResults([]); }}><Video size={14} /> Video</button>
+      <button type="button" role="tab" aria-selected={kind === "link"} onClick={() => setKind("link")}><Link2 size={14} /> Direct link</button>
     </div>
+    {kind === "link" ? <>
+      <form className="shared-media-search" onSubmit={(event) => { event.preventDefault(); findDirectLink(); }}><label htmlFor="shared-media-direct-link">YouTube or YouTube Music link</label><div><input id="shared-media-direct-link" type="url" value={directLink} onChange={(event) => setDirectLink(event.target.value)} placeholder="Paste a YouTube link" required /><button type="submit" aria-label="Find link" disabled={directState.loading}>{directState.loading ? <LoaderCircle className="spin" size={15} /> : <Search size={15} />}</button></div></form>
+      {directState.error && <p className="shared-media-empty shared-media-search-error">{directState.error}</p>}
+      {directResult && <article className="shared-media-direct-result">
+        {directResult.thumbnail ? <img className="shared-media-item-thumbnail" src={directResult.thumbnail} alt="" /> : <span className="shared-media-item-icon"><Link2 size={15} /></span>}
+        <span className="shared-media-item-details"><strong>{directResult.title}</strong><small>{directResult.channel}</small></span>
+        <div className="shared-media-direct-actions"><div role="group" aria-label="Play as"><button type="button" className={directKind === "audio" ? "is-selected" : ""} onClick={() => setDirectKind("audio")}><AudioLines size={13} /> Audio</button><button type="button" className={directKind === "video" ? "is-selected" : ""} onClick={() => setDirectKind("video")}><Video size={13} /> Video</button></div><button type="button" className="shared-media-item-play" disabled={!group.canManageMedia || !group.online} onClick={() => group.playMedia({ ...directResult, kind: directKind })}><Play size={13} /> Play</button></div>
+      </article>}
+      {!directResult && !directState.loading && !directState.error && <p className="shared-media-note">Paste any embeddable YouTube or YouTube Music link to find it.</p>}
+    </> : <>
     <form className="shared-media-search" onSubmit={(event) => { event.preventDefault(); setPageToken(""); setSearchQuery(query.trim()); }}><label htmlFor="shared-media-search-input">Search {kind === "audio" ? "YouTube Music" : "YouTube videos"}</label><div><input id="shared-media-search-input" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={kind === "audio" ? "Search songs or artists" : "Search videos"} /><button type="submit" aria-label="Search YouTube"><Search size={15} /></button></div></form>
     <div className="shared-media-playlist-heading"><strong>{kind === "audio" ? "Audio playlist" : "Video playlist"}<small>{searchQuery ? "Search results" : "Popular picks"}</small></strong><span>{results.length}</span></div>
     <div className="shared-media-playlist">
@@ -300,6 +330,7 @@ function SharedMediaPanel({ group, onClose }) {
       {!searchState.loading && nextPageToken && <button type="button" className="shared-media-load-more" onClick={loadMore}>See more</button>}
       {searchState.loading && results.length > 0 && <p className="shared-media-loading-more">Loading more...</p>}
     </div>
+    </>}
     {!group.canManageMedia && <p className="shared-media-note">Only an Owner/Admin can start shared media. Ask them to allow members to manage it.</p>}
     <p className="shared-media-note">Each person can mute or pause playback on their own device.</p>
     {activeItem && group.canManageMedia && <div className="shared-media-stop-sticky"><button type="button" onClick={group.stopMedia}>Stop for everyone</button></div>}
