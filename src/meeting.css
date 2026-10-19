@@ -3689,3 +3689,133 @@ button:active:not(:disabled) {
 .student-sheet th {
   background: linear-gradient(135deg, #3a2947, #241a2d);
 }
+
+/* Premium theme preview: one visual language across home, meeting and overlays. */
+:root {
+  --accent: #d2b2ff;
+  --green: #c5e6bd;
+  --muted: #aaa1b3;
+  --line: #3c3046;
+}
+body {
+  background:
+    radial-gradient(900px 520px at 18% -10%, #49345d32, transparent 65%),
+    radial-gradient(760px 480px at 100% 100%, #243b3a24, transparent 70%),
+    #0d0b12;
+}
+.meeting-home {
+  background:
+    radial-gradient(900px 600px at 7% 8%, #39254a38, transparent 64%),
+    radial-gradient(800px 600px at 94% 92%, #1d3b3728, transparent 68%),
+    #0c0b11;
+}
+.world-vignette {
+  background:
+    linear-gradient(90deg, #0c0b11f2 0%, #0c0b11a4 30%, #0c0b1100 64%),
+    linear-gradient(0deg, #0c0b11 0%, #0c0b1100 24%, #0c0b1100 80%, #0c0b1190);
+}
+.hero-brand,
+.meeting-header {
+  text-shadow: 0 1px 10px #05030a77;
+}
+.hero-clock,
+.meeting-header,
+.call-bottom-bar {
+  border-color: #ffffff14;
+  background: linear-gradient(110deg, #18131ecc, #110f16e8);
+  box-shadow: inset 0 1px #ffffff0c, 0 8px 25px #05030a3d;
+  backdrop-filter: blur(16px) saturate(125%);
+}
+.hero-clock {
+  border-radius: 12px;
+  box-shadow: inset 0 1px #ffffff18, 0 10px 28px #05030a60;
+}
+.add-meeting-button,
+.choice-action,
+.student-submit-button,
+.recording-download,
+.speaking-current button,
+.speaking-queue-next,
+.shared-media-item-play,
+.shared-media-now-playing button,
+.meeting-share-actions button {
+  border-color: #d4b8ef;
+  background: linear-gradient(135deg, #d4b0ed, #9c72bb);
+  box-shadow: inset 0 1px #ffffff66, 0 8px 20px #6a43824d;
+  color: #211526;
+  font-weight: 650;
+}
+.add-meeting-button:hover,
+.choice-action:hover,
+.student-submit-button:hover:not(:disabled),
+.recording-download:hover:not(:disabled),
+.speaking-current button:hover,
+.speaking-queue-next:hover:not(:disabled),
+.shared-media-item-play:hover:not(:disabled),
+.shared-media-now-playing button:hover:not(:disabled),
+.meeting-share-actions button:hover {
+  border-color: #ead8fb;
+  background: linear-gradient(135deg, #e0c2f6, #ad82ca);
+  box-shadow: inset 0 1px #ffffff80, 0 12px 25px #6a438275;
+  transform: translateY(-1px);
+}
+.entry-choice,
+.join-choice,
+.reconnect-panel,
+.chat-media-picker,
+.member-action-menu,
+.shared-media-direct-result,
+.shared-media-kind-switch,
+.shared-media-stop-sticky {
+  border-color: #584267;
+  background: linear-gradient(145deg, #221a2b, #141017);
+  box-shadow: inset 0 1px #ffffff13, 0 14px 34px #05030a55;
+}
+.entry-choice:hover,
+.join-choice:hover {
+  border-color: #b68bd0;
+  background: linear-gradient(145deg, #34243f, #1c1523);
+  box-shadow: inset 0 1px #ffffff1d, 0 16px 32px #08040d66;
+}
+.sidebar-tabs > button[aria-selected="true"],
+.shared-media-kind-switch button[aria-selected="true"] {
+  background: linear-gradient(135deg, #624475, #33243e);
+  box-shadow: inset 0 1px #ffffff22, 0 3px 9px #09050d55;
+}
+.sidebar-tabs > button > span,
+.chat-count {
+  border: 1px solid #c7a3df55;
+  background: linear-gradient(135deg, #76518d, #412f4e);
+  box-shadow: inset 0 1px #ffffff25, 0 3px 10px #07030c55;
+  color: #f4eafb;
+}
+.recording-live-status,
+.shared-media-stop-sticky button {
+  box-shadow: inset 0 1px #ffffff1d, 0 7px 16px #310c1355;
+}
+.chat-composer,
+.sidebar-top,
+.shared-media-playlist-heading {
+  border-color: #ffffff12;
+}
+input,
+textarea,
+select {
+  caret-color: #e0bdf6;
+}
+input:focus,
+textarea:focus,
+select:focus {
+  box-shadow: 0 0 0 3px #c99be526;
+}
+* {
+  scrollbar-color: #76518d #120f17;
+}
+*::-webkit-scrollbar { width: 9px; height: 9px; }
+*::-webkit-scrollbar-track { background: #120f17; }
+*::-webkit-scrollbar-thumb {
+  border: 2px solid #120f17;
+  border-radius: 99px;
+  background: linear-gradient(180deg, #8962a1, #4a3658);
+}
+*::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, #aa7fc0, #60436f); }
