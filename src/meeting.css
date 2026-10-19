@@ -3513,6 +3513,47 @@ button:active:not(:disabled) {
   .is-in-call .call-bottom-panels .rescue-mode-control { min-width: 30px; width: 30px; padding: 0; }
   .is-in-call .call-bottom-panels .rescue-mode-control span { display: none; }
 }
+
+/* Preview: raised, filled icon surfaces across the meeting UI. */
+.m-icon,
+.group-screen-heading .icon-button,
+.member-actions-trigger,
+.meeting-reaction-picker button,
+.shared-media-playlist-tools button {
+  border: 1px solid #5f486e;
+  background: radial-gradient(circle at 30% 20%, #614872, #251b2d 72%);
+  box-shadow: inset 0 1px #ffffff20, 0 4px 12px #05030a55;
+  color: #d9c2e7;
+  transition: transform .18s ease, background .18s ease, border-color .18s ease, box-shadow .18s ease;
+}
+.m-icon:hover:not(:disabled),
+.group-screen-heading .icon-button:hover,
+.member-actions-trigger:hover,
+.meeting-reaction-picker button:hover,
+.shared-media-playlist-tools button:hover:not(:disabled) {
+  border-color: #b78bd0;
+  background: radial-gradient(circle at 30% 20%, #87649c, #3b2947 74%);
+  box-shadow: inset 0 1px #ffffff2b, 0 6px 18px #05030a88;
+  transform: translateY(-1px);
+}
+.m-icon svg,
+.group-screen-heading .icon-button svg,
+.member-actions-trigger svg,
+.call-control svg { filter: drop-shadow(0 1px 2px #0a0610aa); stroke-width: 2.15; }
+.call-control {
+  border-color: #624a71;
+  background: radial-gradient(circle at 30% 20%, #594067, #211825 74%);
+  box-shadow: inset 0 1px #ffffff1d, 0 4px 12px #07040b66;
+}
+.call-control:hover:not(:disabled) {
+  border-color: #b58bc9;
+  background: radial-gradient(circle at 30% 20%, #806094, #392746 74%);
+  box-shadow: inset 0 1px #ffffff2b, 0 6px 18px #07040b88;
+  transform: translateY(-1px);
+}
+.call-control.control-off { background: radial-gradient(circle at 30% 20%, #64434e, #2d2028 74%); }
+.call-control.share-control.is-sharing { background: radial-gradient(circle at 30% 20%, #527051, #273728 74%); }
+.call-control.hang-up { background: radial-gradient(circle at 30% 20%, #c06c7d, #713846 74%); box-shadow: inset 0 1px #ffffff2c, 0 5px 15px #3b111aaa; }
 .call-bottom-panels .rescue-mode-control {
   display: inline-flex;
   align-items: center;
