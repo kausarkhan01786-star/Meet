@@ -281,7 +281,7 @@ function SharedMediaPanel({ group, onClose }) {
     const panel = event.currentTarget;
     if (panel.scrollTop + panel.clientHeight >= panel.scrollHeight - 90) loadMore();
   }}>
-    <div className="shared-media-panel-heading"><div><h3>Shared media</h3><p>Browse YouTube and play together.</p></div><button type="button" className="m-icon" onClick={onClose} aria-label="Close shared media"><X size={15} /></button></div>
+    <div className="shared-media-panel-heading"><div><h3>Shared media</h3><p>Browse YouTube Music or YouTube and play together.</p></div><button type="button" className="m-icon" onClick={onClose} aria-label="Close shared media"><X size={15} /></button></div>
     {group.isAdmin && <label className="shared-media-permission-setting"><span><strong>Allow members to manage media</strong><small>Let members play audio and videos for everyone.</small></span><input type="checkbox" checked={group.mediaMembersAllowed} onChange={(event) => group.setMediaPermission(event.target.checked)} /></label>}
     <div className="shared-media-kind-switch" role="tablist" aria-label="Shared media type">
       <button type="button" role="tab" aria-selected={kind === "audio"} onClick={() => { setKind("audio"); setQuery(""); setSearchQuery(""); setPageToken(""); }}><AudioLines size={14} /> Audio</button>

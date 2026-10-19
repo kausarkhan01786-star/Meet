@@ -166,7 +166,11 @@ export const SharedMediaPlayer = forwardRef(function SharedMediaPlayer({ media, 
   }
 
   return <div className={`shared-media-player ${media.kind === "audio" ? "is-audio" : "is-video"}`}>
-    <div className="shared-media-youtube-frame"><div ref={hostRef} /></div>
+    {media.kind === "audio" && <div className="shared-media-audio-artwork">
+      <img src={`https://i.ytimg.com/vi/${media.videoId}/hqdefault.jpg`} alt="" />
+      <span><Volume2 size={28} /><strong>Shared YouTube Music</strong><small>Audio only</small></span>
+    </div>}
+    <div className="shared-media-youtube-frame" aria-hidden={media.kind === "audio"}><div ref={hostRef} /></div>
     <div className="shared-media-local-controls" aria-label="Local playback controls">
       <button type="button" onClick={toggleLocalPlayback} disabled={!ready} title={locallyPaused ? "Resume on this device" : "Pause on this device"}>{locallyPaused ? <Play size={14} /> : <Pause size={14} />}{locallyPaused ? "Resume for me" : "Pause for me"}</button>
       <button type="button" onClick={toggleLocalMute} disabled={!ready} title={locallyMuted ? "Unmute on this device" : "Mute on this device"}>{locallyMuted ? <VolumeX size={14} /> : <Volume2 size={14} />}{locallyMuted ? "Unmute for me" : "Mute for me"}</button>
