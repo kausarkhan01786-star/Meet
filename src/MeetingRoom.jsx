@@ -945,7 +945,7 @@ export default function MeetingRoom({
     if (!autoEnter || needsReconnect || profileImageBusy) return;
     if (
       mode === "create" &&
-      name.trim() &&
+      name.trim().length >= 4 &&
       group.online &&
       !group.room &&
       !creating.current
@@ -955,7 +955,7 @@ export default function MeetingRoom({
     }
     if (
       mode === "join" &&
-      name.trim() &&
+      name.trim().length >= 4 &&
       group.online &&
       code.length === 6 &&
       !group.room &&
@@ -1213,7 +1213,8 @@ export default function MeetingRoom({
                 <input
                   className="meeting-name-input"
                   id="display-name"
-                  placeholder="What should we call you?"
+                  placeholder="Name (min. 4 characters)"
+                  minLength={4}
                   maxLength={40}
                   autoComplete="nickname"
                   required
@@ -1225,7 +1226,7 @@ export default function MeetingRoom({
                 <div className="entry-choice-grid">
                   <button
                     className="entry-choice"
-                    disabled={!name.trim() || profileImageBusy}
+                    disabled={name.trim().length < 4 || profileImageBusy}
                     onClick={() => {
                       creating.current = false;
                       setAutoEnter(false);
@@ -1251,7 +1252,7 @@ export default function MeetingRoom({
                   </button>
                   <button
                     className="entry-choice receive-entry"
-                    disabled={!name.trim() || profileImageBusy}
+                    disabled={name.trim().length < 4 || profileImageBusy}
                     onClick={() => {
                       setAutoEnter(true);
                       setMode("join");
@@ -1293,7 +1294,7 @@ export default function MeetingRoom({
                     </span>
                     <button
                       className="connect-call-button"
-                      disabled={!group.online || !name.trim() || group.joining}
+                      disabled={!group.online || name.trim().length < 4 || group.joining}
                       onClick={() => {
                         const previousCode = savedRoomCode.current;
                         attemptedCode.current = previousCode;
@@ -1338,7 +1339,8 @@ export default function MeetingRoom({
                     <input
                       id="join-display-name"
                       className="name-input"
-                      placeholder="What should we call you?"
+                      placeholder="Name (min. 4 characters)"
+                      minLength={4}
                       maxLength={40}
                       autoComplete="nickname"
                       required
@@ -1376,7 +1378,7 @@ export default function MeetingRoom({
                         group.joining ||
                         group.admissionStatus === "pending" ||
                         profileImageBusy ||
-                        !name.trim() ||
+                        name.trim().length < 4 ||
                         code.length !== 6
                       }
                     >
@@ -1410,7 +1412,8 @@ export default function MeetingRoom({
                     <input
                       id="create-display-name"
                       className="name-input"
-                      placeholder="What should we call you?"
+                      placeholder="Name (min. 4 characters)"
+                      minLength={4}
                       maxLength={40}
                       autoComplete="nickname"
                       required
@@ -1424,7 +1427,7 @@ export default function MeetingRoom({
                     <button
                       className="connect-call-button"
                       disabled={
-                        !group.online || group.joining || profileImageBusy || !name.trim()
+                        !group.online || group.joining || profileImageBusy || name.trim().length < 4
                       }
                     >
                       {group.joining ? (

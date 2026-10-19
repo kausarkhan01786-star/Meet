@@ -383,22 +383,26 @@ test("meeting chat uses trusted sender identity, stays room-scoped and limits me
   assert.match((await receive(member)).message, /wait a moment/);
 });
 
-test("meeting create and join require a nonblank name and trim accepted names", async (context) => {
+test("meeting create and join require at least four trimmed name characters", async (context) => {
   const { client, receive, send } = await setup(context, { maxAttempts: 100 });
-  const host = await client();
-  const guest = await client();
-  send(host, { type: "group-create", name: "Host" });
-  const { code } = await receive(host);
-  for (const name of [undefined, null, "", "   ", "\t\n", 42]) {
-    for (const type of ["group-create", "group-join"]) {
-      send(guest, { type, code, name });
-      assert.match((await receive(guest)).message, /Enter your name/);
+  for (const meetingType of ["single", "group"]) {
+    const host = await client();
+    const guest = await client();
+    send(host, { type: "group-create", name: "  Host  ", meetingType });
+    const created = await receive(host);
+    assert.equal(created.type, "group-joined");
+    assert.equal(created.self.name, "Host");
+    for (const name of [undefined, null, "", "   ", "\t\n", 42, "A", "Ab", "Abc", "  Abc  "]) {
+      for (const type of ["group-create", "group-join"]) {
+        send(guest, { type, code: created.code, name, meetingType });
+        assert.match((await receive(guest)).message, /at least 4 characters/);
+      }
     }
+    const noticed = receive(host);
+    send(guest, { type: "group-join", code: created.code, name: "  Rafi  ", meetingType });
+    assert.equal((await receive(guest)).type, "group-joined");
+    assert.equal((await noticed).member.name, "Rafi");
   }
-  const noticed = receive(host);
-  send(guest, { type: "group-join", code, name: "  Kausar mia  " });
-  assert.equal((await receive(guest)).type, "group-joined");
-  assert.equal((await noticed).member.name, "Kausar mia");
 });
 
 test("only authorized admins can manage chat, permissions, roles and removal", async (context) => {

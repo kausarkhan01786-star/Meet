@@ -649,8 +649,8 @@ export function useGroup({ meetingType = "group" } = {}) {
     if (!online || busyRef.current || enteringRef.current || roomRef.current)
       return;
     const displayName = typeof name === "string" ? name.trim() : "";
-    if (!displayName)
-      return setError("Enter your name before creating or joining a meeting.");
+    if (displayName.length < 4)
+      return setError("Enter your name with at least 4 characters before creating or joining a meeting.");
     if (!window.isSecureContext || !window.RTCPeerConnection)
       return setError(
         "Group voice needs HTTPS. Open the HTTPS phone address shown on the PC, or localhost on the PC.",

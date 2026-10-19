@@ -202,10 +202,10 @@ export function createPairingService({
             typeof message.name === "string"
               ? message.name.trim().slice(0, 40)
               : "";
-          if (!memberName)
+          if (memberName.length < 4)
             return send(socket, {
               type: "error",
-              message: "Enter your name before creating or joining a meeting.",
+              message: "Enter your name with at least 4 characters before creating or joining a meeting.",
             });
           const profileImage = typeof message.profileImage === "string" ? message.profileImage : "";
           if (profileImage && (profileImage.length > 12_000 || !/^data:image\/jpeg;base64,[A-Za-z0-9+/]+={0,2}$/.test(profileImage)))
