@@ -828,7 +828,9 @@ button:active:not(:disabled) {
 .poll-add-option { padding: 6px 8px; border: 1px solid #493752; border-radius: 4px; background: #241c2a; color: #cbb3d8; font-size: 10px; }
 .poll-add-option:disabled { opacity: .5; cursor: not-allowed; }
 .poll-create-form > .student-form-heading { margin-bottom: 4px; }
-.poll-create-form .student-submit-button { margin-top: 0; }
+.poll-create-form .student-submit-button { width: auto; height: auto; min-height: 31px; margin-top: 0; padding: 6px 10px; border: 1px solid #735987; border-radius: 4px; background: #382b44; color: #eadcf1; font-size: 10px; }
+.poll-create-form .student-submit-button:hover:not(:disabled) { border-color: #a98ac0; background: #493557; }
+.poll-create-form .student-submit-button:disabled { opacity: .55; cursor: not-allowed; }
 .location-sharing-note { margin: 8px 0; color: #a997b5; font-size: 10px; line-height: 1.45; }
 .workspace-brand {
   display: flex;
