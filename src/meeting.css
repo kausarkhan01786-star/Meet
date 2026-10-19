@@ -3437,6 +3437,9 @@ button:active:not(:disabled) {
 .shared-media-local-controls button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 32px; padding: 0 9px; border: 1px solid #493752; border-radius: 5px; background: #211a29; color: #d9c8e4; font-size: 10px; cursor: pointer; }
 .shared-media-local-controls button:disabled { opacity: .5; cursor: wait; }
 .shared-media-local-controls .shared-media-enable { border-color: #ad8ac1; background: #382945; }
+.shared-media-global-controls { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.shared-media-global-controls button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 34px; padding: 0 11px; border: 1px solid #836395; border-radius: 5px; background: #3d2b48; color: #f2e4f8; font-size: 10px; }
+.shared-media-global-controls .shared-media-stop { border-color: #9f5968; background: #4a2831; color: #ffdce2; }
 .shared-media-error { margin: 0; color: #f0a5a5; text-align: center; font-size: 10px; }
 @media (max-width: 600px) {
   .shared-media-stage { padding: 10px; }

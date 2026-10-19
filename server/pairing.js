@@ -471,11 +471,11 @@ export function createPairingService({
         } else if (message.type === "group-media-playback") {
           const group = groups.get(socket.groupCode);
           const media = group?.activeMedia;
-          if (!media || media.controllerId !== socket.memberId || !Number.isFinite(message.currentTime) || message.currentTime < 0 || message.currentTime > 86_400 || typeof message.isPlaying !== "boolean") return;
+          if (!media || !canControlMedia(socket, group) || !Number.isFinite(message.currentTime) || message.currentTime < 0 || message.currentTime > 86_400 || typeof message.isPlaying !== "boolean") return;
           socket.mediaSyncTimes = (socket.mediaSyncTimes || []).filter((time) => time > Date.now() - 60_000);
           if (socket.mediaSyncTimes.length >= 30) return;
           socket.mediaSyncTimes.push(Date.now());
-          group.activeMedia = { ...media, currentTime: message.currentTime, isPlaying: message.isPlaying, updatedAt: Date.now() };
+          group.activeMedia = { ...media, controllerId: socket.memberId, currentTime: message.currentTime, isPlaying: message.isPlaying, updatedAt: Date.now() };
           broadcastGroup(group, (viewer) => groupState(group, viewer));
         } else if (message.type === "group-location") {
           const group = groups.get(socket.groupCode);

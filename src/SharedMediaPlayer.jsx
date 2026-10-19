@@ -34,6 +34,7 @@ const YouTubeSharedMediaPlayer = forwardRef(function YouTubeSharedMediaPlayer({ 
   const syncRef = useRef(onPlaybackSync);
   const canControlRef = useRef(canControl);
   const localPlaybackActionRef = useRef(false);
+  const remotePlaybackActionRef = useRef(false);
   const localActionTimeoutRef = useRef(null);
   const lastAppliedUpdateRef = useRef(0);
   const localPauseRef = useRef(false);
@@ -96,7 +97,7 @@ const YouTubeSharedMediaPlayer = forwardRef(function YouTubeSharedMediaPlayer({ 
               setPlaybackError("");
               if (!localPauseRef.current) setLocallyPaused(false);
             }
-            if (canControlRef.current && !localPlaybackActionRef.current && (event.data === YT.PlayerState.PLAYING || event.data === YT.PlayerState.PAUSED || event.data === YT.PlayerState.ENDED)) {
+            if (canControlRef.current && !localPlaybackActionRef.current && !remotePlaybackActionRef.current && (event.data === YT.PlayerState.PLAYING || event.data === YT.PlayerState.PAUSED || event.data === YT.PlayerState.ENDED)) {
               syncRef.current?.({ currentTime: event.target.getCurrentTime(), isPlaying });
             }
           },
@@ -126,6 +127,8 @@ const YouTubeSharedMediaPlayer = forwardRef(function YouTubeSharedMediaPlayer({ 
     lastAppliedUpdateRef.current = media.updatedAt;
     const player = playerRef.current;
     if (!player) return;
+    remotePlaybackActionRef.current = true;
+    window.setTimeout(() => { remotePlaybackActionRef.current = false; }, 800);
     const currentTime = player.getCurrentTime?.() || 0;
     if (Number.isFinite(media.currentTime) && Math.abs(currentTime - media.currentTime) > 1.5) player.seekTo(media.currentTime, true);
     if (media.isPlaying && !localPauseRef.current) player.playVideo();
@@ -133,7 +136,7 @@ const YouTubeSharedMediaPlayer = forwardRef(function YouTubeSharedMediaPlayer({ 
   }, [ready, media.updatedAt, media.currentTime, media.isPlaying, media.controllerId, selfId]);
 
   useEffect(() => {
-    if (!ready || !canControl) return;
+    if (!ready || !canControl || media.controllerId !== selfId) return;
     const timer = window.setInterval(() => {
       const player = playerRef.current;
       if (player?.getPlayerState?.() === window.YT?.PlayerState?.PLAYING) {
@@ -141,7 +144,7 @@ const YouTubeSharedMediaPlayer = forwardRef(function YouTubeSharedMediaPlayer({ 
       }
     }, 10000);
     return () => window.clearInterval(timer);
-  }, [ready, canControl]);
+  }, [ready, canControl, media.controllerId, selfId]);
 
   function toggleLocalPlayback() {
     localPlaybackActionRef.current = true;
