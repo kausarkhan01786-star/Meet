@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { speechAudioConstraints } from "./audioConstraints.js";
 
 export async function loadRtcConfiguration(fetchSettings = fetch) {
   const response = await fetchSettings("/api/rtc-config", { cache: "no-store" });
@@ -289,11 +290,7 @@ export function useCast() {
       if (microphone) {
         requestingMicrophone = true;
         voice = await navigator.mediaDevices.getUserMedia({
-          audio: {
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true,
-          },
+          audio: speechAudioConstraints,
           video: false,
         });
         requestingMicrophone = false;

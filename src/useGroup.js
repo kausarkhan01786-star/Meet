@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { loadRtcConfiguration } from "./useCast.js";
 import { playFeedback } from "./feedback.js";
+import { speechAudioConstraints } from "./audioConstraints.js";
 import { parseChatContent } from "../shared/meeting-content.js";
 
 function persistentClientId() {
@@ -524,7 +525,7 @@ export function useGroup({ meetingType = "group" } = {}) {
       if (currentGeneration !== generation.current) return;
       try {
         voice = await navigator.mediaDevices.getUserMedia({
-          audio: { echoCancellation: true, noiseSuppression: true },
+          audio: speechAudioConstraints,
           video: false,
         });
       } catch {
@@ -587,7 +588,7 @@ export function useGroup({ meetingType = "group" } = {}) {
     try {
       if (!micRef.current) {
         const voice = await navigator.mediaDevices.getUserMedia({
-          audio: { echoCancellation: true, noiseSuppression: true },
+          audio: speechAudioConstraints,
           video: false,
         });
         if (currentGeneration !== generation.current || !permissionsRef.current.microphone || roomRef.current?.self?.micLocked) {
