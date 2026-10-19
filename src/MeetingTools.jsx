@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { AlertCircle, Crown, FileUp, GraduationCap, Hand, MapPin, MicOff, MoreHorizontal, Shield, Smile, Trash2, X } from "lucide-react";
+import { AlertCircle, BarChart3, Crown, FileUp, GraduationCap, Hand, MapPin, MicOff, MoreHorizontal, Shield, Smile, Trash2, X } from "lucide-react";
 import { CHAT_EMOJIS, MAX_CHAT_FILE_BYTES, REACTIONS } from "../shared/meeting-content.js";
 
 export function RoleBadge({ role }) {
@@ -64,7 +64,7 @@ export function RichMessage({ message }) {
   return <p>{message.text}</p>;
 }
 
-export function ChatAttachments({ disabled, studentDisabled = disabled, onStudentClick, onEmoji, onSendFile }) {
+export function ChatAttachments({ disabled, studentDisabled = disabled, pollDisabled = disabled, onStudentClick, onPollClick, onEmoji, onSendFile }) {
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [fileError, setFileError] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -92,7 +92,7 @@ export function ChatAttachments({ disabled, studentDisabled = disabled, onStuden
     };
     reader.readAsDataURL(file);
   }
-  return <div className="chat-attachments"><div className="chat-attachment-buttons"><button type="button" className={`m-icon ${emojiOpen ? "is-active" : ""}`} disabled={disabled} title="Emoji" aria-label="Emoji" aria-expanded={emojiOpen} onClick={() => setEmojiOpen(!emojiOpen)}><Smile size={16} /></button><button type="button" className="m-icon" disabled={disabled || uploading} title="Upload a file (up to 5 MB)" aria-label="Upload a file" onClick={() => fileInput.current?.click()}><FileUp size={16} /></button>{onStudentClick && <button type="button" className="m-icon" disabled={studentDisabled} title="Submit student information" aria-label="Submit student information" onClick={onStudentClick}><GraduationCap size={16} /></button>}<input ref={fileInput} className="chat-file-input" type="file" disabled={disabled || uploading} onChange={(event) => uploadFile(event.target.files?.[0])} /></div>{emojiOpen && <div className="chat-media-picker emoji-picker" role="region" aria-label="Emoji picker"><div className="media-picker-heading"><strong>Emoji</strong><button type="button" className="m-icon" title="Close picker" aria-label="Close picker" onClick={() => setEmojiOpen(false)}><X size={15} /></button></div><div className="emoji-options">{CHAT_EMOJIS.map((emoji, index) => <button type="button" key={emoji} onClick={() => onEmoji(emoji)} aria-label={`Insert emoji ${index + 1}`}><span role="img" aria-label={emoji}>{emoji}</span></button>)}</div></div>}{(uploading || fileError) && <span className={`chat-file-feedback ${fileError ? "has-error" : ""}`} role="status">{fileError && <AlertCircle size={12} />}{uploading ? "Uploading…" : fileError}</span>}</div>;
+  return <div className="chat-attachments"><div className="chat-attachment-buttons"><button type="button" className={`m-icon ${emojiOpen ? "is-active" : ""}`} disabled={disabled} title="Emoji" aria-label="Emoji" aria-expanded={emojiOpen} onClick={() => setEmojiOpen(!emojiOpen)}><Smile size={16} /></button><button type="button" className="m-icon" disabled={disabled || uploading} title="Upload a file (up to 5 MB)" aria-label="Upload a file" onClick={() => fileInput.current?.click()}><FileUp size={16} /></button>{onStudentClick && <button type="button" className="m-icon" disabled={studentDisabled} title="Submit student information" aria-label="Submit student information" onClick={onStudentClick}><GraduationCap size={16} /></button>}{onPollClick && <button type="button" className="m-icon" disabled={pollDisabled} title="Create a poll" aria-label="Create a poll" onClick={onPollClick}><BarChart3 size={16} /></button>}<input ref={fileInput} className="chat-file-input" type="file" disabled={disabled || uploading} onChange={(event) => uploadFile(event.target.files?.[0])} /></div>{emojiOpen && <div className="chat-media-picker emoji-picker" role="region" aria-label="Emoji picker"><div className="media-picker-heading"><strong>Emoji</strong><button type="button" className="m-icon" title="Close picker" aria-label="Close picker" onClick={() => setEmojiOpen(false)}><X size={15} /></button></div><div className="emoji-options">{CHAT_EMOJIS.map((emoji, index) => <button type="button" key={emoji} onClick={() => onEmoji(emoji)} aria-label={`Insert emoji ${index + 1}`}><span role="img" aria-label={emoji}>{emoji}</span></button>)}</div></div>}{(uploading || fileError) && <span className={`chat-file-feedback ${fileError ? "has-error" : ""}`} role="status">{fileError && <AlertCircle size={12} />}{uploading ? "Uploading…" : fileError}</span>}</div>;
 }
 
 export function ReactionControls({ group }) {

@@ -96,6 +96,7 @@ export function useGroup({ meetingType = "group" } = {}) {
   const [recordingParticipants, setRecordingParticipants] = useState([]);
   const [recordingAnnouncement, setRecordingAnnouncement] = useState(null);
   const [recordingStopSignal, setRecordingStopSignal] = useState(0);
+  const [polls, setPolls] = useState([]);
   const [students, setStudents] = useState([]);
   const [studentSubmission, setStudentSubmission] = useState("");
   const [studentSubmitted, setStudentSubmitted] = useState(false);
@@ -188,6 +189,7 @@ export function useGroup({ meetingType = "group" } = {}) {
     setReactions([]);
     setRecordingParticipants([]);
     setRecordingAnnouncement(null);
+    setPolls([]);
     setAdmissionRequests([]);
     setStudents([]);
     setStudentSubmission("");
@@ -392,6 +394,7 @@ export function useGroup({ meetingType = "group" } = {}) {
             setSelf(message.self);
             setAdmissionRequests(message.admissionRequests || []);
             setRecordingParticipants(message.recordingParticipants || []);
+            setPolls(message.polls || []);
             setStudents(message.students || []);
             setStudentSubmitted(message.studentAlreadySubmitted === true);
             setStudentSubmission(message.studentAlreadySubmitted ? "You have already submitted your student details for this meeting." : "");
@@ -426,6 +429,7 @@ export function useGroup({ meetingType = "group" } = {}) {
             setSelf(roomRef.current.self);
             setAdmissionRequests(message.admissionRequests || []);
             setRecordingParticipants(message.recordingParticipants || []);
+            setPolls(message.polls || []);
             setStudents(message.students || []);
             setStudentSubmitted(message.studentAlreadySubmitted === true);
             if (message.studentAlreadySubmitted) setStudentSubmission("You have already submitted your student details for this meeting.");
@@ -939,6 +943,14 @@ export function useGroup({ meetingType = "group" } = {}) {
   function reportRecording(active) {
     if (roomRef.current) send({ type: "group-recording", active });
   }
+  function createPoll(question, options) {
+    if (!roomRef.current || !["owner", "admin"].includes(roomRef.current.self?.role)) return false;
+    return send({ type: "group-poll-create", question, options });
+  }
+  function votePoll(pollId, optionId) {
+    if (!roomRef.current) return false;
+    return send({ type: "group-poll-vote", pollId, optionId });
+  }
   function submitStudentDetails(details) {
     if (!roomRef.current || !online) return false;
     clearTimeout(studentSubmissionTimeoutRef.current);
@@ -992,6 +1004,9 @@ export function useGroup({ meetingType = "group" } = {}) {
     recordingParticipants,
     recordingAnnouncement,
     recordingStopSignal,
+    polls,
+    createPoll,
+    votePoll,
     students,
     studentSubmission,
     studentSubmitted,

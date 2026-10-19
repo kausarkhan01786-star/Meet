@@ -3,6 +3,7 @@ import {
   ArrowLeft,
   ArrowRight,
   AudioLines,
+  BarChart3,
   Check,
   ChevronDown,
   Circle,
@@ -236,6 +237,10 @@ function ChatPanel({ group, tab, setTab, onClose, isRecording, startRecording, s
   const [studentFormOpen, setStudentFormOpen] = useState(false);
   const [studentDetails, setStudentDetails] = useState({ name: "", roll: "", section: "", department: "" });
   const [studentFeedback, setStudentFeedback] = useState("");
+  const [pollFormOpen, setPollFormOpen] = useState(false);
+  const [pollQuestion, setPollQuestion] = useState("");
+  const [pollOptions, setPollOptions] = useState(["", ""]);
+  const [pollFeedback, setPollFeedback] = useState("");
   const chatDisabled = group.room?.chatEnabled === false;
   const cannotSend = !group.room || !group.online || chatDisabled;
   const everyoneMicLocked = Boolean(group.room?.muteAllLocked || group.self?.micLocked || group.members.some((member) => member.micLocked));
@@ -245,13 +250,17 @@ function ChatPanel({ group, tab, setTab, onClose, isRecording, startRecording, s
     setStudentFormOpen(false);
     setStudentDetails({ name: "", roll: "", section: "", department: "" });
     setStudentFeedback("");
+    setPollFormOpen(false);
+    setPollQuestion("");
+    setPollOptions(["", ""]);
+    setPollFeedback("");
   }, [group.room?.selfId]);
   useEffect(() => {
     if (group.studentSubmission) setStudentFeedback(group.studentSubmission);
   }, [group.studentSubmission]);
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-  }, [group.messages.length]);
+  }, [group.messages.length, group.polls.length]);
   function submit(event) {
     event.preventDefault();
     if (group.sendMessage(draft)) setDraft("");
@@ -263,6 +272,19 @@ function ChatPanel({ group, tab, setTab, onClose, isRecording, startRecording, s
     }
     if (group.submitStudentDetails(studentDetails)) setStudentFeedback("Sending your details...");
     else setStudentFeedback("Could not send your details. Check your meeting connection.");
+  }
+  function submitPoll() {
+    const options = pollOptions.map((option) => option.trim());
+    if (!pollQuestion.trim() || options.length < 2 || options.some((option) => !option)) {
+      setPollFeedback("Add a question and at least two options.");
+      return;
+    }
+    if (group.createPoll(pollQuestion.trim(), options)) {
+      setPollFormOpen(false);
+      setPollQuestion("");
+      setPollOptions(["", ""]);
+      setPollFeedback("");
+    } else setPollFeedback("Could not create the poll. Check your meeting connection.");
   }
   return (
     <aside className="meeting-sidebar" aria-label="Meeting sidebar">
@@ -315,7 +337,7 @@ function ChatPanel({ group, tab, setTab, onClose, isRecording, startRecording, s
             aria-label="Meeting messages"
             aria-live="polite"
           >
-            {!group.messages.length && (
+            {!group.messages.length && !group.polls.length && (
               <div className="chat-empty">
                 <span>
                   <MessageSquare size={25} strokeWidth={1.2} />
@@ -349,6 +371,23 @@ function ChatPanel({ group, tab, setTab, onClose, isRecording, startRecording, s
                 <RichMessage message={message} />
               </article>
             ))}
+            {group.polls.map((poll) => {
+              const voteTotal = poll.options.reduce((sum, option) => sum + option.votes, 0);
+              return <article className="meeting-poll-card" key={poll.id}>
+                <div className="meeting-poll-heading"><BarChart3 size={15} /><strong>{poll.question}</strong></div>
+                <small>Poll by {poll.creatorName}</small>
+                <div className="meeting-poll-options">{poll.options.map((option) => {
+                  const percentage = voteTotal ? Math.round(option.votes / voteTotal * 100) : 0;
+                  const selected = poll.myVote === option.id;
+                  return <button type="button" key={option.id} className={`meeting-poll-option ${selected ? "is-selected" : ""}`} aria-pressed={selected} onClick={() => group.votePoll(poll.id, option.id)}>
+                    <span className="meeting-poll-option-bar" style={{ width: `${percentage}%` }} />
+                    <span className="meeting-poll-option-label">{option.label}</span>
+                    <span className="meeting-poll-option-count">{option.votes}{voteTotal ? ` · ${percentage}%` : ""}</span>
+                  </button>;
+                })}</div>
+                <small>{voteTotal} vote{voteTotal === 1 ? "" : "s"}{poll.myVote ? " · You can change your vote" : " · Select an option to vote"}</small>
+              </article>;
+            })}
             <div ref={bottomRef} />
           </div>
           <form className="chat-composer" onSubmit={submit}>
@@ -385,7 +424,14 @@ function ChatPanel({ group, tab, setTab, onClose, isRecording, startRecording, s
                 {studentFeedback && <small className="student-feedback" role="status">{studentFeedback}</small>}
               </div>
             )}
-            <ChatAttachments disabled={cannotSend} studentDisabled={!group.room || !group.online} onStudentClick={() => { setStudentFeedback(""); setStudentFormOpen((open) => !open); }} onEmoji={(emoji) => setDraft((current) => (current + emoji).slice(0, 2000))} onSendFile={group.sendFile} />
+            {pollFormOpen && <div className="poll-create-form" role="group" aria-label="Create poll">
+              <div className="student-form-heading"><strong>Create a poll</strong><button type="button" className="m-icon" aria-label="Close poll form" title="Close poll form" onClick={() => setPollFormOpen(false)}><X size={14} /></button></div>
+              <label>Question<input maxLength={160} value={pollQuestion} onChange={(event) => setPollQuestion(event.target.value)} placeholder="Ask a question" /></label>
+              <div className="poll-create-options">{pollOptions.map((option, index) => <label key={index}>Option {index + 1}<span><input maxLength={80} value={option} onChange={(event) => setPollOptions((current) => current.map((item, itemIndex) => itemIndex === index ? event.target.value : item))} placeholder={`Choice ${index + 1}`} />{pollOptions.length > 2 && <button type="button" className="m-icon" aria-label={`Remove option ${index + 1}`} onClick={() => setPollOptions((current) => current.filter((_, itemIndex) => itemIndex !== index))}><X size={13} /></button>}</span></label>)}</div>
+              <div className="poll-create-actions"><button type="button" className="poll-add-option" disabled={pollOptions.length >= 6} onClick={() => setPollOptions((current) => [...current, ""])}>Add option</button><button type="button" className="student-submit-button" disabled={cannotSend} onClick={submitPoll}>Create poll</button></div>
+              {pollFeedback && <small className="student-feedback" role="status">{pollFeedback}</small>}
+            </div>}
+            <ChatAttachments disabled={cannotSend} studentDisabled={!group.room || !group.online} onStudentClick={() => { setStudentFeedback(""); setPollFormOpen(false); setStudentFormOpen((open) => !open); }} onPollClick={group.isAdmin ? () => { setStudentFormOpen(false); setPollFeedback(""); setPollFormOpen((open) => !open); } : undefined} pollDisabled={!group.room || !group.online} onEmoji={(emoji) => setDraft((current) => (current + emoji).slice(0, 2000))} onSendFile={group.sendFile} />
             <div>
               <span>
                 <LockKeyhole size={11} /> Only in this meeting

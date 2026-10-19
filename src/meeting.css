@@ -805,6 +805,30 @@ button:active:not(:disabled) {
 .student-registration-form > .student-submit-button { width: auto; height: auto; min-height: 31px; margin-top: 9px; padding: 6px 10px; border: 1px solid #735987; border-radius: 4px; background: #382b44; color: #eadcf1; font-size: 10px; }
 .student-registration-form > .student-submit-button:disabled { opacity: .55; cursor: not-allowed; }
 .student-feedback { display: block; margin-top: 7px; color: #b9dfc7; font-size: 10px; }
+.meeting-poll-card { margin: 0 0 16px; padding: 12px; border: 1px solid #493752; border-radius: 7px; background: #19151f; }
+.meeting-poll-heading { display: flex; align-items: flex-start; gap: 7px; color: #e4d7eb; font-size: 12px; line-height: 1.5; }
+.meeting-poll-heading svg { flex: 0 0 auto; margin-top: 1px; color: #c5a4dc; }
+.meeting-poll-card > small { display: block; margin-top: 5px; color: #927e9e; font-size: 9px; }
+.meeting-poll-options { display: grid; gap: 6px; margin: 11px 0 8px; }
+.meeting-poll-option { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 34px; overflow: hidden; padding: 7px 9px; border: 1px solid #493752; border-radius: 5px; background: #211a29; color: #ddcce7; text-align: left; }
+.meeting-poll-option:hover, .meeting-poll-option.is-selected { border-color: #9b78b2; }
+.meeting-poll-option-bar { position: absolute; inset: 0 auto 0 0; background: #a77fc31c; pointer-events: none; }
+.meeting-poll-option-label, .meeting-poll-option-count { position: relative; z-index: 1; overflow-wrap: anywhere; }
+.meeting-poll-option-label { font-size: 10px; }
+.meeting-poll-option-count { flex: 0 0 auto; color: #bda0d0; font-size: 9px; }
+.poll-create-form { display: block !important; margin: 10px 0 !important; padding: 10px; border: 1px solid #493752; border-radius: 6px; background: #19151f; }
+.poll-create-form > label, .poll-create-options label { display: flex; min-width: 0; flex-direction: column; gap: 5px; margin-top: 8px; color: #c6b4d0; font-size: 10px; }
+.poll-create-form input { width: 100%; min-width: 0; min-height: 32px; padding: 6px 8px; border: 1px solid #493752; border-radius: 4px; outline: none; background: #120f17; color: #f0e6f6; font: inherit; }
+.poll-create-form input:focus { border-color: #b994d2; }
+.poll-create-options { display: grid; grid-template-columns: 1fr 1fr; gap: 0 8px; }
+.poll-create-options label > span { display: flex; min-width: 0; gap: 4px; }
+.poll-create-options label > span > input { flex: 1; }
+.poll-create-options .m-icon { flex: 0 0 29px; }
+.poll-create-actions { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 9px; }
+.poll-add-option { padding: 6px 8px; border: 1px solid #493752; border-radius: 4px; background: #241c2a; color: #cbb3d8; font-size: 10px; }
+.poll-add-option:disabled { opacity: .5; cursor: not-allowed; }
+.poll-create-form > .student-form-heading { margin-bottom: 4px; }
+.poll-create-form .student-submit-button { margin-top: 0; }
 .location-sharing-note { margin: 8px 0; color: #a997b5; font-size: 10px; line-height: 1.45; }
 .workspace-brand {
   display: flex;

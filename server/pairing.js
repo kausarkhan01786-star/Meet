@@ -31,7 +31,7 @@ export function createPairingService({
     rescueMode: Boolean(socket.groupRescueMode),
     ...(includeLocation && socket.groupLocation ? { location: socket.groupLocation } : {}),
   });
-  const groupState = (group, viewer) => ({ type: "group-state", ownerId: group.ownerId, chatEnabled: group.chatEnabled, muteAllLocked: group.muteAllLocked === true, recordingAllowed: group.recordingAllowed === true, recordingParticipants: [...(group.recordingMembers?.values() || [])].map(({ id, name }) => ({ id, name })), studentAlreadySubmitted: Boolean(group.students?.has(viewer?.groupClientId)), ...(["owner", "admin"].includes(viewer?.groupRole) ? { students: [...(group.students?.values() || [])] } : {}), members: [...group.members.values()].map((member) => memberInfo(member, ["owner", "admin"].includes(viewer?.groupRole))), admissionRequests: [...group.admissionRequests.values()].map(({ id, name, requestedAt }) => ({ id, name, requestedAt })) });
+  const groupState = (group, viewer) => ({ type: "group-state", ownerId: group.ownerId, chatEnabled: group.chatEnabled, muteAllLocked: group.muteAllLocked === true, recordingAllowed: group.recordingAllowed === true, recordingParticipants: [...(group.recordingMembers?.values() || [])].map(({ id, name }) => ({ id, name })), polls: [...(group.polls?.values() || [])].map((poll) => ({ id: poll.id, question: poll.question, createdBy: poll.createdBy, creatorName: poll.creatorName, createdAt: poll.createdAt, myVote: poll.votes.get(viewer?.memberId) || null, options: poll.options.map((option) => ({ ...option, votes: poll.counts.get(option.id) || 0 })) })), studentAlreadySubmitted: Boolean(group.students?.has(viewer?.groupClientId)), ...(["owner", "admin"].includes(viewer?.groupRole) ? { students: [...(group.students?.values() || [])] } : {}), members: [...group.members.values()].map((member) => memberInfo(member, ["owner", "admin"].includes(viewer?.groupRole))), admissionRequests: [...group.admissionRequests.values()].map(({ id, name, requestedAt }) => ({ id, name, requestedAt })) });
   const clearFileUpload = (socket) => {
     if (!socket.groupFileUpload) return;
     clearTimeout(socket.groupFileUpload.timer);
@@ -221,6 +221,7 @@ export function createPairingService({
               recordingAllowed: false,
               recordingMembers: new Map(),
               students: new Map(),
+              polls: new Map(),
               ownerId: null,
               blockedClientIds: new Set(),
               admissionRequests: new Map(),
@@ -293,6 +294,7 @@ export function createPairingService({
             muteAllLocked: group.muteAllLocked === true,
             recordingAllowed: group.recordingAllowed === true,
             recordingParticipants: [...(group.recordingMembers?.values() || [])].map(({ id, name }) => ({ id, name })),
+            polls: [...group.polls.values()].map((poll) => ({ id: poll.id, question: poll.question, createdBy: poll.createdBy, creatorName: poll.creatorName, createdAt: poll.createdAt, myVote: poll.votes.get(socket.memberId) || null, options: poll.options.map((option) => ({ ...option, votes: poll.counts.get(option.id) || 0 })) })),
             studentAlreadySubmitted: group.students.has(socket.groupClientId),
             ...(["owner", "admin"].includes(socket.groupRole) ? { students: [...group.students.values()] } : {}),
             admissionRequests: [...group.admissionRequests.values()].map(({ id, name, requestedAt }) => ({ id, name, requestedAt })),
@@ -403,6 +405,33 @@ export function createPairingService({
           if (socket.reactionTimes.length >= 4) return send(socket, { type: "error", message: "Please wait before reacting again." });
           socket.reactionTimes.push(Date.now());
           broadcastGroup(group, { type: "group-reaction", id: randomUUID(), senderId: socket.memberId, name: socket.memberName, reaction: message.reaction, sentAt: Date.now() });
+        } else if (message.type === "group-poll-create") {
+          const group = groups.get(socket.groupCode);
+          if (!group || !["owner", "admin"].includes(socket.groupRole)) return;
+          const question = typeof message.question === "string" ? message.question.trim() : "";
+          const options = Array.isArray(message.options) ? message.options.map((option) => typeof option === "string" ? option.trim() : "") : [];
+          if (!question || question.length > 160 || options.length < 2 || options.length > 6 || options.some((option) => !option || option.length > 80)) return send(socket, { type: "error", message: "Polls need a question and 2–6 options (up to 80 characters each)." });
+          if (group.polls.size >= 20) return send(socket, { type: "error", message: "This meeting has reached its 20-poll limit." });
+          socket.pollCreateTimes = (socket.pollCreateTimes || []).filter((time) => time > Date.now() - 60_000);
+          if (socket.pollCreateTimes.length >= 5) return send(socket, { type: "error", message: "Please wait before creating another poll." });
+          socket.pollCreateTimes.push(Date.now());
+          const pollId = randomUUID();
+          const pollOptions = options.map((label) => ({ id: randomUUID(), label }));
+          group.polls.set(pollId, { id: pollId, question, creatorName: socket.memberName, createdBy: socket.memberId, createdAt: Date.now(), options: pollOptions, votes: new Map(), counts: new Map(pollOptions.map((option) => [option.id, 0])) });
+          broadcastGroup(group, (viewer) => groupState(group, viewer));
+        } else if (message.type === "group-poll-vote") {
+          const group = groups.get(socket.groupCode);
+          const poll = group?.polls.get(message.pollId);
+          if (!poll || typeof message.optionId !== "string" || !poll.options.some((option) => option.id === message.optionId)) return;
+          socket.pollVoteTimes = (socket.pollVoteTimes || []).filter((time) => time > Date.now() - 60_000);
+          if (socket.pollVoteTimes.length >= 60) return send(socket, { type: "error", message: "Please wait before changing your poll vote." });
+          socket.pollVoteTimes.push(Date.now());
+          const previousOptionId = poll.votes.get(socket.memberId);
+          if (previousOptionId === message.optionId) return;
+          if (previousOptionId) poll.counts.set(previousOptionId, Math.max(0, (poll.counts.get(previousOptionId) || 0) - 1));
+          poll.votes.set(socket.memberId, message.optionId);
+          poll.counts.set(message.optionId, (poll.counts.get(message.optionId) || 0) + 1);
+          broadcastGroup(group, (viewer) => groupState(group, viewer));
         } else if (message.type === "group-chat") {
           const group = groups.get(socket.groupCode);
           if (!group) return;
