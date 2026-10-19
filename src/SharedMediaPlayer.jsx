@@ -33,7 +33,7 @@ function loadYouTubeApi() {
   return youtubeApiPromise;
 }
 
-const YouTubeSharedMediaPlayer = forwardRef(function YouTubeSharedMediaPlayer({ media, selfId, canControl, onPlaybackSync }, ref) {
+const YouTubeSharedMediaPlayer = forwardRef(function YouTubeSharedMediaPlayer({ media, selfId, canControl, onPlaybackSync, onStop }, ref) {
   const playerRef = useRef(null);
   const hostRef = useRef(null);
   const syncRef = useRef(onPlaybackSync);
@@ -217,16 +217,17 @@ const YouTubeSharedMediaPlayer = forwardRef(function YouTubeSharedMediaPlayer({ 
       <label className="shared-media-seek"><span>{formatTime(currentTime)} / {formatTime(duration)}</span><input type="range" min="0" max={Math.max(1, duration)} step="0.1" value={Math.min(currentTime, Math.max(1, duration))} onChange={seekForEveryone} disabled={!ready || !duration || !canControl} aria-label="Seek shared audio for everyone" /></label>
       <label className="shared-media-volume"><Volume2 size={14} /><input type="range" min="0" max="100" value={volume} onChange={changeVolume} disabled={!ready} aria-label="Volume on this device" /></label>
     </div>}
-    <div className="shared-media-local-controls" aria-label="Local playback controls">
-      <button type="button" onClick={toggleLocalPlayback} disabled={!ready} title={locallyPaused ? "Resume on this device" : "Pause on this device"}>{locallyPaused ? <Play size={14} /> : <Pause size={14} />}{locallyPaused ? "Resume for me" : "Pause for me"}</button>
-      <button type="button" onClick={toggleLocalMute} disabled={!ready} title={locallyMuted ? "Unmute on this device" : "Mute on this device"}>{locallyMuted ? <VolumeX size={14} /> : <Volume2 size={14} />}{locallyMuted ? "Unmute for me" : "Mute for me"}</button>
-      {autoplayBlocked && <button type="button" className="shared-media-enable" onClick={() => { playerRef.current?.playVideo?.(); setAutoplayBlocked(false); }}>Tap to enable playback</button>}
+    <div className="shared-media-playback-controls" aria-label="Playback controls">
+      <button type="button" onClick={toggleLocalPlayback} disabled={!ready} title={locallyPaused ? "Resume on this device" : "Pause on this device"} aria-label={locallyPaused ? "Resume on this device" : "Pause on this device"}>{locallyPaused ? <Play size={17} fill="currentColor" /> : <Pause size={17} fill="currentColor" />}</button>
+      <button type="button" onClick={toggleLocalMute} disabled={!ready} title={locallyMuted ? "Unmute on this device" : "Mute on this device"} aria-label={locallyMuted ? "Unmute on this device" : "Mute on this device"}>{locallyMuted ? <VolumeX size={17} /> : <Volume2 size={17} />}</button>
+      {canControl && <><i aria-hidden="true" /><button type="button" onClick={() => media.isPlaying ? playerRef.current?.pauseVideo?.() : playerRef.current?.playVideo?.()} disabled={!ready} title={media.isPlaying ? "Pause for everyone" : "Resume for everyone"} aria-label={media.isPlaying ? "Pause for everyone" : "Resume for everyone"}>{media.isPlaying ? <Pause size={17} fill="currentColor" /> : <Play size={17} fill="currentColor" />}</button><button type="button" className="shared-media-stop" onClick={onStop} title="Stop for everyone" aria-label="Stop for everyone"><Square size={15} fill="currentColor" /></button></>}
+      {autoplayBlocked && <button type="button" className="shared-media-enable" onClick={() => { playerRef.current?.playVideo?.(); setAutoplayBlocked(false); }} title="Enable playback" aria-label="Enable playback"><Play size={17} fill="currentColor" /></button>}
     </div>
     {playbackError && <p className="shared-media-error" role="status">{playbackError}</p>}
   </div>;
 });
 
-const DirectMediaPlayer = forwardRef(function DirectMediaPlayer({ media, selfId, canControl, onPlaybackSync }, ref) {
+const DirectMediaPlayer = forwardRef(function DirectMediaPlayer({ media, selfId, canControl, onPlaybackSync, onStop }, ref) {
   const elementRef = useRef(null);
   const syncRef = useRef(onPlaybackSync);
   const localPauseRef = useRef(false);
@@ -296,9 +297,10 @@ const DirectMediaPlayer = forwardRef(function DirectMediaPlayer({ media, selfId,
       <label className="shared-media-seek"><span>{formatTime(currentTime)} / {formatTime(duration)}</span><input type="range" min="0" max={Math.max(1, duration)} step="0.1" value={Math.min(currentTime, Math.max(1, duration))} onChange={seekForEveryone} disabled={!ready || !duration || !canControl} aria-label="Seek shared audio for everyone" /></label>
       <label className="shared-media-volume"><Volume2 size={14} /><input type="range" min="0" max="100" value={volume} onChange={changeVolume} disabled={!ready} aria-label="Volume on this device" /></label>
     </div>}
-    <div className="shared-media-local-controls" aria-label="Local playback controls">
-      <button type="button" onClick={localPause} disabled={!ready}>{locallyPaused ? <Play size={14} /> : <Pause size={14} />}{locallyPaused ? "Resume for me" : "Pause for me"}</button>
-      <button type="button" onClick={localMute} disabled={!ready}>{locallyMuted ? <VolumeX size={14} /> : <Volume2 size={14} />}{locallyMuted ? "Unmute for me" : "Mute for me"}</button>
+    <div className="shared-media-playback-controls" aria-label="Playback controls">
+      <button type="button" onClick={localPause} disabled={!ready} title={locallyPaused ? "Resume on this device" : "Pause on this device"} aria-label={locallyPaused ? "Resume on this device" : "Pause on this device"}>{locallyPaused ? <Play size={17} fill="currentColor" /> : <Pause size={17} fill="currentColor" />}</button>
+      <button type="button" onClick={localMute} disabled={!ready} title={locallyMuted ? "Unmute on this device" : "Mute on this device"} aria-label={locallyMuted ? "Unmute on this device" : "Mute on this device"}>{locallyMuted ? <VolumeX size={17} /> : <Volume2 size={17} />}</button>
+      {canControl && <><i aria-hidden="true" /><button type="button" onClick={() => media.isPlaying ? elementRef.current?.pause?.() : elementRef.current?.play?.()} disabled={!ready} title={media.isPlaying ? "Pause for everyone" : "Resume for everyone"} aria-label={media.isPlaying ? "Pause for everyone" : "Resume for everyone"}>{media.isPlaying ? <Pause size={17} fill="currentColor" /> : <Play size={17} fill="currentColor" />}</button><button type="button" className="shared-media-stop" onClick={onStop} title="Stop for everyone" aria-label="Stop for everyone"><Square size={15} fill="currentColor" /></button></>}
     </div>
     {error && <p className="shared-media-error" role="status">{error}</p>}
   </div>;

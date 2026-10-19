@@ -26,7 +26,6 @@ import {
   MoreHorizontal,
   Phone,
   PhoneOff,
-  Pause,
   Play,
   Plus,
   RotateCw,
@@ -1455,12 +1454,9 @@ export default function MeetingRoom({
                       media={group.activeMedia}
                       selfId={group.room?.selfId}
                       canControl={group.canManageMedia}
+                      onStop={group.stopMedia}
                       onPlaybackSync={group.syncMediaPlayback}
                     />
-                    {group.canManageMedia && <div className="shared-media-global-controls" aria-label="Shared playback controls">
-                      <button type="button" onClick={() => group.activeMedia.isPlaying ? sharedMediaPlayerRef.current?.pause() : sharedMediaPlayerRef.current?.play()}>{group.activeMedia.isPlaying ? <Pause size={15} /> : <Play size={15} />}{group.activeMedia.isPlaying ? "Pause for everyone" : "Resume for everyone"}</button>
-                      <button type="button" className="shared-media-stop" onClick={group.stopMedia}><Square size={14} />Stop for everyone</button>
-                    </div>}
                   </div>
                 ) : screenCount ? (
                   <div className="meeting-screens">
