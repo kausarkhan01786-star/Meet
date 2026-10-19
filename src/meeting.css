@@ -3589,3 +3589,103 @@ button:active:not(:disabled) {
 .connection-quality-dot.quality-unstable,
 .connection-quality-dot.quality-connecting { background: #e6b965; }
 .connection-quality-dot.quality-poor { background: #e27676; }
+
+/* Preview: premium filled surfaces for cards, panels and shapes. */
+.meeting-stage,
+.meeting-sidebar,
+.shared-media-dock,
+.meeting-share-modal,
+.student-sheet-section,
+.student-registration-form,
+.meeting-poll-card,
+.poll-create-form,
+.speaking-queue-section,
+.recording-permission-setting,
+.shared-media-audio-controls,
+.shared-media-audio-artwork,
+.shared-media-item,
+.chat-file-attachment {
+  border-color: #554063;
+  background: linear-gradient(145deg, #211a29 0%, #15111b 100%);
+  box-shadow: inset 0 1px #ffffff12, 0 10px 26px #06040a40;
+}
+.meeting-stage {
+  background: radial-gradient(ellipse at 50% 0%, #2b20363d, #17131e 62%);
+}
+.meeting-sidebar,
+.shared-media-dock {
+  background: linear-gradient(180deg, #1b1521 0%, #121016 100%);
+}
+.camera-tile,
+.group-screen,
+.voice-avatar,
+.person-avatar,
+.chat-empty > span {
+  border-color: #654b75;
+  background: radial-gradient(circle at 30% 20%, #463252, #1d1624 76%);
+  box-shadow: inset 0 1px #ffffff17, 0 8px 22px #07040b4f;
+}
+.camera-tile {
+  box-shadow: inset 0 1px #ffffff12, 0 8px 20px #07040b38;
+}
+.camera-tile.is-speaking {
+  border-color: #b58dd0;
+  box-shadow: inset 0 1px #ffffff22, 0 0 0 2px #a978c51f, 0 10px 26px #0b061055;
+}
+.person-row {
+  margin: 5px 0;
+  padding: 10px 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  transition: background .18s ease, border-color .18s ease, transform .18s ease;
+}
+.person-row:hover {
+  border-color: #4f3a5d;
+  background: linear-gradient(135deg, #2a2032, #19131f);
+  transform: translateY(-1px);
+}
+.chat-message p,
+.speaking-current,
+.meeting-poll-option,
+.student-sheet-wrap,
+.chat-composer textarea,
+.student-form-fields input,
+.poll-create-form input,
+.meeting-share-modal > input {
+  border-color: #5b4369;
+  background: linear-gradient(145deg, #2a2033, #19131f);
+  box-shadow: inset 0 1px #ffffff0d, 0 4px 12px #07040a30;
+}
+.chat-message.is-own p {
+  border-color: #79548f;
+  background: linear-gradient(145deg, #3a2948, #241a2e);
+}
+.meeting-poll-option:hover,
+.meeting-poll-option.is-selected,
+.shared-media-item:hover {
+  border-color: #aa7fc2;
+  background: linear-gradient(135deg, #3b2947, #211827);
+  box-shadow: inset 0 1px #ffffff16, 0 6px 16px #09050d4d;
+}
+.voice-avatar,
+.person-avatar,
+.chat-empty > span {
+  overflow: hidden;
+}
+.voice-avatar::before,
+.person-avatar::before,
+.chat-empty > span::before {
+  position: absolute;
+  top: 0;
+  left: 14%;
+  width: 72%;
+  height: 40%;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #ffffff18, transparent);
+  content: "";
+  pointer-events: none;
+}
+.person-avatar > img { position: relative; z-index: 1; }
+.student-sheet th {
+  background: linear-gradient(135deg, #3a2947, #241a2d);
+}
