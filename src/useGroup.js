@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { loadRtcConfiguration } from "./useCast.js";
 import { playFeedback } from "./feedback.js";
 import { speechAudioConstraints } from "./audioConstraints.js";
-import { parseChatContent } from "../shared/meeting-content.js";
+import { isValidMeetingName, parseChatContent } from "../shared/meeting-content.js";
 
 function persistentClientId() {
   const key = "meeting.participant-id.v1";
@@ -649,8 +649,8 @@ export function useGroup({ meetingType = "group" } = {}) {
     if (!online || busyRef.current || enteringRef.current || roomRef.current)
       return;
     const displayName = typeof name === "string" ? name.trim() : "";
-    if (displayName.length < 4)
-      return setError("Enter your name with at least 4 characters before creating or joining a meeting.");
+    if (!isValidMeetingName(displayName))
+      return setError("Enter your name with at least 4 characters and no numbers before creating or joining a meeting.");
     if (!window.isSecureContext || !window.RTCPeerConnection)
       return setError(
         "Group voice needs HTTPS. Open the HTTPS phone address shown on the PC, or localhost on the PC.",

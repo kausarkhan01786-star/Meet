@@ -1,6 +1,6 @@
 import { randomInt, randomUUID } from "node:crypto";
 import { WebSocketServer, WebSocket } from "ws";
-import { MAX_CHAT_FILE_BYTES, parseChatContent, REACTIONS } from "../shared/meeting-content.js";
+import { isValidMeetingName, MAX_CHAT_FILE_BYTES, parseChatContent, REACTIONS } from "../shared/meeting-content.js";
 
 export function createPairingService({
   ttl = 600_000,
@@ -202,10 +202,10 @@ export function createPairingService({
             typeof message.name === "string"
               ? message.name.trim().slice(0, 40)
               : "";
-          if (memberName.length < 4)
+          if (!isValidMeetingName(message.name))
             return send(socket, {
               type: "error",
-              message: "Enter your name with at least 4 characters before creating or joining a meeting.",
+              message: "Enter your name with at least 4 characters and no numbers before creating or joining a meeting.",
             });
           const profileImage = typeof message.profileImage === "string" ? message.profileImage : "";
           if (profileImage && (profileImage.length > 12_000 || !/^data:image\/jpeg;base64,[A-Za-z0-9+/]+={0,2}$/.test(profileImage)))

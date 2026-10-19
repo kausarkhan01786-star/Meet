@@ -54,6 +54,7 @@ import { saveMeetingSession } from "./meetingSession.js";
 import { saveMeetingRecording } from "./meetingRecording.js";
 import { ChatAttachments, MemberActions, MemberLocation, MeetingReactions, ReactionControls, RichMessage, RoleBadge } from "./MeetingTools";
 import { SharedMediaPlayer } from "./SharedMediaPlayer";
+import { isValidMeetingName } from "../shared/meeting-content.js";
 
 async function downloadStudentSheet(students, meetingCode) {
   const pageWidth = 1190;
@@ -945,7 +946,7 @@ export default function MeetingRoom({
     if (!autoEnter || needsReconnect || profileImageBusy) return;
     if (
       mode === "create" &&
-      name.trim().length >= 4 &&
+      isValidMeetingName(name) &&
       group.online &&
       !group.room &&
       !creating.current
@@ -955,7 +956,7 @@ export default function MeetingRoom({
     }
     if (
       mode === "join" &&
-      name.trim().length >= 4 &&
+      isValidMeetingName(name) &&
       group.online &&
       code.length === 6 &&
       !group.room &&
@@ -1213,19 +1214,21 @@ export default function MeetingRoom({
                   className="meeting-name-input"
                   id="display-name"
                   placeholder="Name (min. 4 characters)"
+                  pattern={"[^\\p{N}]*"}
+                  title="At least 4 characters, no numbers"
                   minLength={4}
                   maxLength={40}
                   autoComplete="nickname"
                   required
                   aria-required="true"
                   value={name}
-                  onChange={(event) => setName(event.target.value)}
+                  onChange={(event) => setName(event.target.value.replace(/\p{N}/gu, ""))}
                 />
                 <ProfileImagePicker profileImage={profileImage} name={name} disabled={profileImageBusy} error={profileImageBusy ? "Processing image..." : profileImageError} onSelect={selectProfileImage} onRemove={removeProfileImage} />
                 <div className="entry-choice-grid">
                   <button
                     className="entry-choice"
-                    disabled={name.trim().length < 4 || profileImageBusy}
+                    disabled={!isValidMeetingName(name) || profileImageBusy}
                     onClick={() => {
                       creating.current = false;
                       setAutoEnter(false);
@@ -1251,7 +1254,7 @@ export default function MeetingRoom({
                   </button>
                   <button
                     className="entry-choice receive-entry"
-                    disabled={name.trim().length < 4 || profileImageBusy}
+                    disabled={!isValidMeetingName(name) || profileImageBusy}
                     onClick={() => {
                       setAutoEnter(true);
                       setMode("join");
@@ -1293,7 +1296,7 @@ export default function MeetingRoom({
                     </span>
                     <button
                       className="connect-call-button"
-                      disabled={!group.online || name.trim().length < 4 || group.joining}
+                      disabled={!group.online || !isValidMeetingName(name) || group.joining}
                       onClick={() => {
                         const previousCode = savedRoomCode.current;
                         attemptedCode.current = previousCode;
@@ -1339,6 +1342,8 @@ export default function MeetingRoom({
                       id="join-display-name"
                       className="name-input"
                       placeholder="Name (min. 4 characters)"
+                      pattern={"[^\\p{N}]*"}
+                      title="At least 4 characters, no numbers"
                       minLength={4}
                       maxLength={40}
                       autoComplete="nickname"
@@ -1346,7 +1351,7 @@ export default function MeetingRoom({
                       autoFocus
                       value={name}
                       disabled={group.joining || group.admissionStatus === "pending"}
-                      onChange={(event) => setName(event.target.value)}
+                      onChange={(event) => setName(event.target.value.replace(/\p{N}/gu, ""))}
                     />
                     <ProfileImagePicker profileImage={profileImage} name={name} disabled={group.joining || group.admissionStatus === "pending" || profileImageBusy} error={profileImageBusy ? "Processing image..." : profileImageError} onSelect={selectProfileImage} onRemove={removeProfileImage} />
                     <label htmlFor="meeting-code">
@@ -1377,7 +1382,7 @@ export default function MeetingRoom({
                         group.joining ||
                         group.admissionStatus === "pending" ||
                         profileImageBusy ||
-                        name.trim().length < 4 ||
+                        !isValidMeetingName(name) ||
                         code.length !== 6
                       }
                     >
@@ -1412,6 +1417,8 @@ export default function MeetingRoom({
                       id="create-display-name"
                       className="name-input"
                       placeholder="Name (min. 4 characters)"
+                      pattern={"[^\\p{N}]*"}
+                      title="At least 4 characters, no numbers"
                       minLength={4}
                       maxLength={40}
                       autoComplete="nickname"
@@ -1419,14 +1426,14 @@ export default function MeetingRoom({
                       autoFocus
                       value={name}
                       disabled={group.joining}
-                      onChange={(event) => setName(event.target.value)}
+                      onChange={(event) => setName(event.target.value.replace(/\p{N}/gu, ""))}
                     />
                     <ProfileImagePicker profileImage={profileImage} name={name} disabled={group.joining || profileImageBusy} error={profileImageBusy ? "Processing image..." : profileImageError} onSelect={selectProfileImage} onRemove={removeProfileImage} />
                     <p className="location-sharing-note">Your browser will ask to share your location. Meeting admins can view it on a map.</p>
                     <button
                       className="connect-call-button"
                       disabled={
-                        !group.online || group.joining || profileImageBusy || name.trim().length < 4
+                        !group.online || group.joining || profileImageBusy || !isValidMeetingName(name)
                       }
                     >
                       {group.joining ? (

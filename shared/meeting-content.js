@@ -11,6 +11,10 @@ export const CHAT_EMOJIS = ["\u{1F600}", "\u{1F60A}", "\u{1F602}", "\u{1F44D}", 
 
 export const MAX_CHAT_FILE_BYTES = 5 * 1024 * 1024;
 
+export function isValidMeetingName(name) {
+  return typeof name === "string" && name.trim().length >= 4 && !/\p{N}/u.test(name);
+}
+
 export function parseChatContent(message) {
   const kind = message.kind || (message.data ? "file" : "text");
   if (kind === "text") {

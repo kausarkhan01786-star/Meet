@@ -4,7 +4,16 @@ import { createServer } from "node:http";
 import { once, on } from "node:events";
 import { WebSocket } from "ws";
 import { createPairingService } from "../server/pairing.js";
-import { parseChatContent } from "../shared/meeting-content.js";
+import { isValidMeetingName, parseChatContent } from "../shared/meeting-content.js";
+
+test("meeting names accept letters and reject Unicode numbers", () => {
+  for (const name of ["Rafi", "  Kausar mia  ", "Anne-Marie", "O'Neil", "\u0995\u09be\u0989\u09b8\u09be\u09b0"]) {
+    assert.equal(isValidMeetingName(name), true, name);
+  }
+  for (const name of ["1234", "Rafi1", "Rafi\u09e7", "Rafi\u0661", "Rafi\uff11", "Rafi\u00b2", "Rafi".repeat(10) + "1", "Abc", "   ", undefined]) {
+    assert.equal(isValidMeetingName(name), false, String(name));
+  }
+});
 
 test("chat validates text and uploaded file attachments", () => {
   assert.equal(parseChatContent({ text: "Hello \u{1F44B}" }).kind, "text");
@@ -383,7 +392,7 @@ test("meeting chat uses trusted sender identity, stays room-scoped and limits me
   assert.match((await receive(member)).message, /wait a moment/);
 });
 
-test("meeting create and join require at least four trimmed name characters", async (context) => {
+test("meeting create and join require at least four trimmed name characters without numbers", async (context) => {
   const { client, receive, send } = await setup(context, { maxAttempts: 100 });
   for (const meetingType of ["single", "group"]) {
     const host = await client();
@@ -392,10 +401,10 @@ test("meeting create and join require at least four trimmed name characters", as
     const created = await receive(host);
     assert.equal(created.type, "group-joined");
     assert.equal(created.self.name, "Host");
-    for (const name of [undefined, null, "", "   ", "\t\n", 42, "A", "Ab", "Abc", "  Abc  "]) {
+    for (const name of [undefined, null, "", "   ", "\t\n", 42, "A", "Ab", "Abc", "  Abc  ", "1234", "Rafi1", "Rafi\u09e7", "Rafi\u0661", "Rafi\uff11", "Rafi".repeat(10) + "1"]) {
       for (const type of ["group-create", "group-join"]) {
         send(guest, { type, code: created.code, name, meetingType });
-        assert.match((await receive(guest)).message, /at least 4 characters/);
+        assert.match((await receive(guest)).message, /at least 4 characters and no numbers/);
       }
     }
     const noticed = receive(host);
