@@ -3905,3 +3905,15 @@ select:focus {
 .meeting-sidebar .chat-empty > span::before {
   display: none;
 }
+
+/* Reconnect is a real card, so keep generous space around its content. */
+.reconnect-panel {
+  padding: 32px 30px 26px;
+  border-radius: 12px;
+}
+.reconnect-panel .connect-call-button {
+  max-width: none;
+}
+@media (max-width: 480px) {
+  .reconnect-panel { padding: 26px 20px 22px; }
+}
