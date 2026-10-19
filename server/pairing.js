@@ -458,7 +458,6 @@ export function createPairingService({
             if (socket.mediaAddTimes.length >= 20) return send(socket, { type: "error", message: "Please wait before playing more media." });
             socket.mediaAddTimes.push(Date.now());
             item = { id: randomUUID(), kind: message.kind, title, videoId, addedBy: socket.memberName, addedAt: Date.now() };
-            group.mediaPlaylist.push(item);
           }
           if (!item) return send(socket, { type: "error", message: "That media item is no longer in the playlist." });
           group.activeMedia = { ...item, controllerId: socket.memberId, currentTime: 0, isPlaying: true, updatedAt: Date.now() };

@@ -27,7 +27,6 @@ import {
   PhoneOff,
   Play,
   Plus,
-  RefreshCw,
   Send,
   Search,
   Settings2,
@@ -245,7 +244,6 @@ function SharedMediaPanel({ group, onClose }) {
   const [pageToken, setPageToken] = useState("");
   const [nextPageToken, setNextPageToken] = useState("");
   const [searchState, setSearchState] = useState({ loading: false, error: "" });
-  const items = group.mediaPlaylist.filter((item) => item.kind === kind);
   const activeItem = group.activeMedia;
   useEffect(() => {
     if (!group.room || !group.online) return undefined;
@@ -259,7 +257,7 @@ function SharedMediaPanel({ group, onClose }) {
         const response = await fetch(`/api/media/search?${params}`, { signal: controller.signal });
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || "YouTube search failed.");
-        setResults(data.items || []);
+        setResults((current) => pageToken ? [...current, ...(data.items || []).filter((item) => !current.some((existing) => existing.videoId === item.videoId))] : (data.items || []));
         setNextPageToken(data.nextPageToken || "");
         setSearchState({ loading: false, error: "" });
       } catch (error) {
@@ -275,7 +273,13 @@ function SharedMediaPanel({ group, onClose }) {
   function play(item) {
     group.playMedia({ kind, title: item.title, videoId: item.videoId });
   }
-  return <div className="shared-media-panel">
+  function loadMore() {
+    if (!searchState.loading && nextPageToken) setPageToken(nextPageToken);
+  }
+  return <div className="shared-media-panel" onScroll={(event) => {
+    const panel = event.currentTarget;
+    if (panel.scrollTop + panel.clientHeight >= panel.scrollHeight - 90) loadMore();
+  }}>
     <div className="shared-media-panel-heading"><div><h3>Shared media</h3><p>Browse YouTube and play together.</p></div><button type="button" className="m-icon" onClick={onClose} aria-label="Close shared media"><X size={15} /></button></div>
     {group.isAdmin && <label className="shared-media-permission-setting"><span><strong>Allow members to manage media</strong><small>Let members play audio and videos for everyone.</small></span><input type="checkbox" checked={group.mediaMembersAllowed} onChange={(event) => group.setMediaPermission(event.target.checked)} /></label>}
     <div className="shared-media-kind-switch" role="tablist" aria-label="Shared media type">
@@ -283,7 +287,7 @@ function SharedMediaPanel({ group, onClose }) {
       <button type="button" role="tab" aria-selected={kind === "video"} onClick={() => { setKind("video"); setQuery(""); setSearchQuery(""); setPageToken(""); }}><Video size={14} /> Video</button>
     </div>
     <form className="shared-media-search" onSubmit={(event) => { event.preventDefault(); setPageToken(""); setSearchQuery(query.trim()); }}><label htmlFor="shared-media-search-input">Search {kind === "audio" ? "YouTube Music" : "YouTube videos"}</label><div><input id="shared-media-search-input" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={kind === "audio" ? "Search songs or artists" : "Search videos"} /><button type="submit" aria-label="Search YouTube"><Search size={15} /></button></div></form>
-    <div className="shared-media-playlist-heading"><strong>{kind === "audio" ? "Audio playlist" : "Video playlist"}<small>{searchQuery ? "Search results" : "Popular picks"}</small></strong><span>{results.length}</span><button type="button" className="shared-media-refresh" disabled={searchState.loading} onClick={() => setPageToken(nextPageToken || "")} title="Show new results"><RefreshCw className={searchState.loading ? "spin" : ""} size={13} /> Refresh</button></div>
+    <div className="shared-media-playlist-heading"><strong>{kind === "audio" ? "Audio playlist" : "Video playlist"}<small>{searchQuery ? "Search results" : "Popular picks"}</small></strong><span>{results.length}</span></div>
     <div className="shared-media-playlist">
       {searchState.loading && <p className="shared-media-empty">Finding {kind === "audio" ? "music" : "videos"}…</p>}
       {!searchState.loading && searchState.error && <p className="shared-media-empty shared-media-search-error">{searchState.error}</p>}
@@ -293,11 +297,12 @@ function SharedMediaPanel({ group, onClose }) {
         <span className="shared-media-item-details"><strong>{item.title}</strong><small>{item.channel}</small></span>
         <button type="button" className="shared-media-item-play" disabled={!group.canManageMedia || !group.online} onClick={() => play(item)} title={`Play ${item.title} for everyone`}><Play size={13} /> Play</button>
       </article>)}
+      {!searchState.loading && nextPageToken && <button type="button" className="shared-media-load-more" onClick={loadMore}>Load more</button>}
+      {searchState.loading && results.length > 0 && <p className="shared-media-empty">Loading more…</p>}
     </div>
     {!group.canManageMedia && <p className="shared-media-note">Only an Owner/Admin can start shared media. Ask them to allow members to manage it.</p>}
-    {items.length > 0 && <><div className="shared-media-playlist-heading"><strong>Meeting queue</strong><span>{items.length}</span></div><div className="shared-media-playlist">{items.map((item) => <article className={`shared-media-item ${activeItem?.id === item.id ? "is-active" : ""}`} key={item.id}><span className="shared-media-item-icon">{kind === "audio" ? <AudioLines size={15} /> : <Video size={15} />}</span><span className="shared-media-item-details"><strong>{item.title}</strong><small>Added by {item.addedBy}</small></span><button type="button" className="shared-media-item-play" disabled={!group.canManageMedia || !group.online} onClick={() => group.playMedia(item.id)}><Play size={13} /> Play</button></article>)}</div></>}
-    {activeItem && <div className="shared-media-now-playing"><span>Now playing: <strong>{activeItem.title}</strong></span>{group.canManageMedia && <button type="button" onClick={group.stopMedia}>Stop for everyone</button>}</div>}
     <p className="shared-media-note">Each person can mute or pause playback on their own device.</p>
+    {activeItem && group.canManageMedia && <div className="shared-media-stop-sticky"><button type="button" onClick={group.stopMedia}>Stop for everyone</button></div>}
   </div>;
 }
 
