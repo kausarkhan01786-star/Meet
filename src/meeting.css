@@ -3827,3 +3827,81 @@ select:focus {
   background: linear-gradient(180deg, #8962a1, #4a3658);
 }
 *::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, #aa7fc0, #60436f); }
+
+/* Keep the chat/sidebar deliberately quiet: color marks actions, not filled boxes. */
+.meeting-header .m-icon,
+.meeting-sidebar .m-icon,
+.meeting-sidebar .member-actions-trigger,
+.meeting-sidebar .meeting-reaction-picker button,
+.meeting-sidebar .chat-composer .m-icon {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  color: #9d87ad;
+}
+.meeting-header .m-icon:hover:not(:disabled),
+.meeting-sidebar .m-icon:hover:not(:disabled),
+.meeting-sidebar .member-actions-trigger:hover,
+.meeting-sidebar .meeting-reaction-picker button:hover,
+.meeting-sidebar .chat-composer .m-icon:hover {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  color: #dfb9fa;
+  transform: none;
+}
+.meeting-sidebar .sidebar-tabs > button[aria-selected="true"] {
+  background: transparent;
+  box-shadow: none;
+  color: #d9b5f2;
+}
+.meeting-sidebar .sidebar-tabs > button:hover {
+  color: #c9a6df;
+}
+.meeting-sidebar .sidebar-tabs > button > span,
+.meeting-sidebar .chat-count {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: #bd94d6;
+}
+.meeting-sidebar .speaking-queue-section,
+.meeting-sidebar .recording-permission-setting,
+.meeting-sidebar .student-registration-form,
+.meeting-sidebar .poll-create-form,
+.meeting-sidebar .meeting-poll-card,
+.meeting-sidebar .student-sheet-section {
+  border-color: #ffffff12;
+  background: transparent;
+  box-shadow: none;
+}
+.meeting-sidebar .speaking-current,
+.meeting-sidebar .meeting-poll-option,
+.meeting-sidebar .chat-message p,
+.meeting-sidebar .chat-message.is-own p {
+  border-color: #ffffff12;
+  background: transparent;
+  box-shadow: none;
+}
+.meeting-sidebar .person-row {
+  margin: 0;
+  padding: 17px 0;
+  border: 0;
+  border-bottom: 1px solid #ffffff08;
+  border-radius: 0;
+  background: transparent;
+}
+.meeting-sidebar .person-row:hover {
+  border-color: #ffffff08;
+  background: transparent;
+  transform: none;
+}
+.meeting-sidebar .chat-empty > span {
+  position: relative;
+  border-color: #4e355b;
+  background: transparent;
+  box-shadow: none;
+}
+.meeting-sidebar .chat-empty > span::before {
+  display: none;
+}
