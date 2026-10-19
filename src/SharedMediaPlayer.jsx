@@ -28,7 +28,7 @@ function loadYouTubeApi() {
   return youtubeApiPromise;
 }
 
-export const SharedMediaPlayer = forwardRef(function SharedMediaPlayer({ media, selfId, canControl, onPlaybackSync }, ref) {
+const YouTubeSharedMediaPlayer = forwardRef(function YouTubeSharedMediaPlayer({ media, selfId, canControl, onPlaybackSync }, ref) {
   const playerRef = useRef(null);
   const hostRef = useRef(null);
   const syncRef = useRef(onPlaybackSync);
@@ -178,4 +178,66 @@ export const SharedMediaPlayer = forwardRef(function SharedMediaPlayer({ media, 
     </div>
     {playbackError && <p className="shared-media-error" role="status">{playbackError}</p>}
   </div>;
+});
+
+const DirectMediaPlayer = forwardRef(function DirectMediaPlayer({ media, selfId, canControl, onPlaybackSync }, ref) {
+  const elementRef = useRef(null);
+  const syncRef = useRef(onPlaybackSync);
+  const localPauseRef = useRef(false);
+  const applyingRef = useRef(false);
+  const lastAppliedUpdateRef = useRef(0);
+  const [ready, setReady] = useState(false);
+  const [locallyPaused, setLocallyPaused] = useState(false);
+  const [locallyMuted, setLocallyMuted] = useState(false);
+  const [error, setError] = useState("");
+  syncRef.current = onPlaybackSync;
+
+  useImperativeHandle(ref, () => ({
+    play: () => { elementRef.current?.play?.().catch(() => {}); setLocallyPaused(false); localPauseRef.current = false; },
+    pause: () => { elementRef.current?.pause?.(); setLocallyPaused(true); localPauseRef.current = true; },
+  }), []);
+
+  useEffect(() => {
+    const element = elementRef.current;
+    if (!element || !ready || media.updatedAt === lastAppliedUpdateRef.current || media.controllerId === selfId) return;
+    lastAppliedUpdateRef.current = media.updatedAt;
+    applyingRef.current = true;
+    if (Number.isFinite(media.currentTime) && Math.abs(element.currentTime - media.currentTime) > 1.5) element.currentTime = media.currentTime;
+    if (media.isPlaying && !localPauseRef.current) element.play().catch(() => {});
+    else if (!media.isPlaying) element.pause();
+    window.setTimeout(() => { applyingRef.current = false; }, 250);
+  }, [ready, media.updatedAt, media.currentTime, media.isPlaying, media.controllerId, selfId]);
+
+  const sync = (isPlaying) => {
+    if (canControl && !applyingRef.current) syncRef.current?.({ currentTime: elementRef.current?.currentTime || 0, isPlaying });
+  };
+  const localPause = () => {
+    const element = elementRef.current;
+    if (!element) return;
+    localPauseRef.current = !localPauseRef.current;
+    setLocallyPaused(localPauseRef.current);
+    if (localPauseRef.current) element.pause();
+    else element.play().catch(() => {});
+  };
+  const localMute = () => {
+    const element = elementRef.current;
+    if (!element) return;
+    element.muted = !element.muted;
+    setLocallyMuted(element.muted);
+  };
+  const sharedProps = { ref: elementRef, src: media.sourceUrl, controls: media.kind === "video", onCanPlay: () => { setReady(true); setError(""); if (media.isPlaying && !localPauseRef.current) elementRef.current?.play?.().catch(() => {}); }, onPlay: () => sync(true), onPause: () => sync(false), onError: () => setError("This site did not provide a browser-playable media stream."), playsInline: true };
+  return <div className={`shared-media-player direct-media-player ${media.kind === "audio" ? "is-audio" : "is-video"}`}>
+    {media.kind === "audio" ? <audio className="shared-media-direct-audio" {...sharedProps} /> : <video className="shared-media-direct-video" {...sharedProps} />}
+    <div className="shared-media-local-controls" aria-label="Local playback controls">
+      <button type="button" onClick={localPause} disabled={!ready}>{locallyPaused ? <Play size={14} /> : <Pause size={14} />}{locallyPaused ? "Resume for me" : "Pause for me"}</button>
+      <button type="button" onClick={localMute} disabled={!ready}>{locallyMuted ? <VolumeX size={14} /> : <Volume2 size={14} />}{locallyMuted ? "Unmute for me" : "Mute for me"}</button>
+    </div>
+    {error && <p className="shared-media-error" role="status">{error}</p>}
+  </div>;
+});
+
+export const SharedMediaPlayer = forwardRef(function SharedMediaPlayer(props, ref) {
+  return props.media.sourceUrl
+    ? <DirectMediaPlayer {...props} ref={ref} />
+    : <YouTubeSharedMediaPlayer {...props} ref={ref} />;
 });

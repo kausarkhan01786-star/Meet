@@ -286,9 +286,19 @@ function SharedMediaPanel({ group, onClose }) {
     setDirectState({ loading: true, error: "" });
     setDirectResult(null);
     try {
-      const response = await fetch(`/api/media/lookup?url=${encodeURIComponent(directLink.trim())}`);
-      const item = await response.json();
-      if (!response.ok) throw new Error(item.error || "Could not find this link.");
+      const source = new URL(directLink.trim());
+      if (!/^https?:$/.test(source.protocol)) throw new Error("Paste a valid http or https media link.");
+      const host = source.hostname.replace(/^www\./i, "").toLowerCase();
+      let item;
+      if (["youtube.com", "m.youtube.com", "music.youtube.com", "youtu.be"].includes(host)) {
+        const response = await fetch(`/api/media/lookup?url=${encodeURIComponent(source.href)}`);
+        item = await response.json();
+        if (!response.ok) throw new Error(item.error || "Could not find this link.");
+      } else {
+        const filename = decodeURIComponent(source.pathname.split("/").filter(Boolean).pop() || "").replace(/\.[a-z0-9]{2,5}$/i, "") || source.hostname;
+        const audioExtension = /\.(mp3|m4a|aac|ogg|wav|flac|opus)(?:$|[?#])/i.test(source.pathname);
+        item = { sourceUrl: source.href, title: filename.slice(0, 120), channel: source.hostname, thumbnail: "", suggestedKind: audioExtension ? "audio" : "video" };
+      }
       setDirectResult(item);
       setDirectKind(item.suggestedKind === "audio" ? "audio" : "video");
       setDirectState({ loading: false, error: "" });

@@ -453,11 +453,12 @@ export function createPairingService({
           if (!item && (message.kind === "audio" || message.kind === "video")) {
             const title = typeof message.title === "string" ? message.title.trim().slice(0, 120) : "";
             const videoId = typeof message.videoId === "string" ? message.videoId : "";
-            if (!title || !/^[\w-]{11}$/.test(videoId) || group.mediaPlaylist.length >= 100) return send(socket, { type: "error", message: "That YouTube item cannot be played." });
+            const sourceUrl = typeof message.sourceUrl === "string" && message.sourceUrl.length <= 2_000 && /^https?:\/\//i.test(message.sourceUrl) ? message.sourceUrl : "";
+            if (!title || (!/^[\w-]{11}$/.test(videoId) && !sourceUrl) || group.mediaPlaylist.length >= 100) return send(socket, { type: "error", message: "That media link cannot be played." });
             socket.mediaAddTimes = (socket.mediaAddTimes || []).filter((time) => time > Date.now() - 60_000);
             if (socket.mediaAddTimes.length >= 20) return send(socket, { type: "error", message: "Please wait before playing more media." });
             socket.mediaAddTimes.push(Date.now());
-            item = { id: randomUUID(), kind: message.kind, title, videoId, addedBy: socket.memberName, addedAt: Date.now() };
+            item = { id: randomUUID(), kind: message.kind, title, videoId, sourceUrl, addedBy: socket.memberName, addedAt: Date.now() };
           }
           if (!item) return send(socket, { type: "error", message: "That media item is no longer in the playlist." });
           group.activeMedia = { ...item, controllerId: socket.memberId, currentTime: 0, isPlaying: true, updatedAt: Date.now() };
