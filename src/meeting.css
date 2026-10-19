@@ -996,6 +996,20 @@ button:active:not(:disabled) {
   height: 28px;
   color: #927aa4;
 }
+.meeting-share-backdrop { position: fixed; z-index: 50; inset: 0; display: grid; place-items: start center; padding: max(24px, env(safe-area-inset-top)) 18px 24px; background: #08070db8; backdrop-filter: blur(5px); }
+.meeting-share-modal { box-sizing: border-box; width: min(480px, 100%); margin-top: 28px; padding: 20px; border: 1px solid #59406a; border-radius: 9px; background: #19141f; box-shadow: 0 22px 60px #00000088; color: #ddcee6; }
+.meeting-share-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.meeting-share-heading > div { display: grid; gap: 4px; }
+.meeting-share-heading span, .meeting-share-modal > label { color: #b895d0; font-size: 9px; font-weight: 700; letter-spacing: 1px; }
+.meeting-share-heading h2 { margin: 0; color: #f1e7f5; font: 600 20px/1.2 var(--heading); }
+.meeting-share-modal > p { margin: 16px 0; color: #b6a6c0; font-size: 12px; line-height: 1.55; }
+.meeting-share-modal > label { display: block; margin-bottom: 7px; }
+.meeting-share-modal > input { box-sizing: border-box; width: 100%; min-width: 0; height: 42px; padding: 0 10px; border: 1px solid #584266; border-radius: 5px; outline: none; background: #110e15; color: #e6d9ed; font: 12px var(--body); }
+.meeting-share-modal > input:focus { border-color: #b994d2; }
+.meeting-share-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.meeting-share-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 36px; padding: 0 12px; border: 1px solid #705682; border-radius: 5px; background: #30233a; color: #f0e3f6; font: 12px var(--body); }
+.meeting-share-actions .meeting-share-native { border-color: #9270a7; background: #b994d2; color: #201627; }
+@media (max-width: 520px) { .meeting-share-modal { margin-top: 12px; padding: 16px; } .meeting-share-actions button { flex: 1 1 130px; } }
 .meeting-entry {
   width: min(790px, 100%);
   margin: 15px auto 55px;

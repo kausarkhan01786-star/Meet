@@ -47,7 +47,15 @@ function DigitalClock() {
 }
 
 export default function MeetingApp() {
-  const [initialSession] = useState(readMeetingSession);
+  const [sharedJoinCode, setSharedJoinCode] = useState(() => {
+    const code = new URLSearchParams(window.location.search).get("join") || "";
+    return /^\d{6}$/.test(code) ? code : "";
+  });
+  const [initialSession] = useState(() => {
+    const saved = readMeetingSession();
+    if (!sharedJoinCode) return saved;
+    return { ...saved, view: "group", minimized: false, pickerOpen: false, mode: "join", code: sharedJoinCode, roomCode: "", joinFromShare: true };
+  });
   const [view, setView] = useState(initialSession.view);
   const [minimized, setMinimized] = useState(
     initialSession.view !== "home" && initialSession.minimized,
@@ -58,6 +66,9 @@ export default function MeetingApp() {
   useEffect(() => {
     saveMeetingSession({ view, minimized, pickerOpen: optionsOpen });
   }, [view, minimized, optionsOpen]);
+  useEffect(() => {
+    if (sharedJoinCode && view === "group") setSharedJoinCode("");
+  }, [sharedJoinCode, view]);
   useEffect(() => {
     if (optionsOpen && dialogRef.current && !dialogRef.current.open)
       dialogRef.current.showModal();
@@ -84,7 +95,7 @@ export default function MeetingApp() {
         <MeetingRoom
           key={view}
           meetingType={view}
-          initialSession={readMeetingSession()}
+          initialSession={sharedJoinCode ? initialSession : readMeetingSession()}
           minimized={minimized}
           onMinimize={() => setMinimized(true)}
           onRestore={() => setMinimized(false)}

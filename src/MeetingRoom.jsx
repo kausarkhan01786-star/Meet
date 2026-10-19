@@ -29,6 +29,7 @@ import {
   Plus,
   Send,
   Search,
+  Share2,
   Settings2,
   ShieldCheck,
   Square,
@@ -692,8 +693,10 @@ export default function MeetingRoom({
   const [needsReconnect, setNeedsReconnect] = useState(
     Boolean(initialSession.roomCode),
   );
-  const [autoEnter, setAutoEnter] = useState(!initialSession.mode);
+  const [autoEnter, setAutoEnter] = useState(!initialSession.mode || initialSession.joinFromShare === true);
   const [copied, setCopied] = useState(false);
+  const [shareModalOpen, setShareModalOpen] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
   const [speakersMuted, setSpeakersMuted] = useState(false);
   const [chatOpen, setChatOpen] = useState(
     () => initialSession.chatOpen ?? window.innerWidth > 1050,
@@ -948,6 +951,27 @@ export default function MeetingRoom({
       );
     }
   }
+  const shareLink = group.room
+    ? `${window.location.origin}${window.location.pathname}?join=${group.room.code}`
+    : "";
+  async function copyShareLink() {
+    try {
+      await navigator.clipboard.writeText(shareLink);
+      setShareCopied(true);
+      clearTimeout(copyTimer.current);
+      copyTimer.current = setTimeout(() => setShareCopied(false), 2000);
+    } catch {
+      group.setError("Clipboard unavailable. Select and copy the invite link manually.");
+    }
+  }
+  async function shareMeetingLink() {
+    if (!navigator.share) return copyShareLink();
+    try {
+      await navigator.share({ title: "Join my Meeting", text: `Join my meeting with code ${group.room.code}`, url: shareLink });
+    } catch (failure) {
+      if (failure?.name !== "AbortError") copyShareLink();
+    }
+  }
   function leave() {
     group.leave();
     setNeedsReconnect(false);
@@ -1055,6 +1079,9 @@ export default function MeetingRoom({
                     onClick={copyCode}
                   >
                     {copied ? <Check size={16} /> : <Copy size={16} />}
+                  </button>
+                  <button className="m-icon" aria-label="Share meeting link" title="Share meeting link" onClick={() => setShareModalOpen(true)}>
+                    <Share2 size={16} />
                   </button>
                 </div>
               </div>
@@ -1624,6 +1651,25 @@ export default function MeetingRoom({
           ))}
         </div>
       </div>
+      {shareModalOpen && group.room && (
+        <div className="meeting-share-backdrop" role="presentation" onMouseDown={(event) => {
+          if (event.target === event.currentTarget) setShareModalOpen(false);
+        }}>
+          <section className="meeting-share-modal" role="dialog" aria-modal="true" aria-labelledby="share-meeting-title">
+            <div className="meeting-share-heading">
+              <div><span>MEETING INVITE</span><h2 id="share-meeting-title">Share this meeting</h2></div>
+              <button className="m-icon" aria-label="Close share dialog" onClick={() => setShareModalOpen(false)}><X size={18} /></button>
+            </div>
+            <p>Anyone with this link can open the join page. Members removed from this meeting must still be accepted by an Owner or Admin before they can rejoin.</p>
+            <label htmlFor="meeting-share-link">INVITE LINK</label>
+            <input id="meeting-share-link" readOnly value={shareLink} onFocus={(event) => event.currentTarget.select()} />
+            <div className="meeting-share-actions">
+              <button onClick={copyShareLink}>{shareCopied ? <Check size={16} /> : <Copy size={16} />}{shareCopied ? "Copied" : "Copy link"}</button>
+              <button className="meeting-share-native" onClick={shareMeetingLink}><Share2 size={16} />Share</button>
+            </div>
+          </section>
+        </div>
+      )}
       {minimized && (
         <section className="minimized-call" aria-label="Minimized meeting">
           <button
