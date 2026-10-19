@@ -3377,6 +3377,14 @@ button:active:not(:disabled) {
 .shared-media-playlist-heading > span { color: #ac96b9; font-size: 10px; }
 .shared-media-load-more { width: 100%; min-height: 32px; border: 1px dashed #594766; border-radius: 5px; background: #211a29; color: #cdb9d9; font-size: 10px; }
 .shared-media-playlist { display: grid; gap: 7px; }
+.shared-media-loading-list { display: grid; gap: 7px; }
+.shared-media-loading-item { display: grid; grid-template-columns: 48px 1fr 46px; align-items: center; gap: 8px; min-height: 56px; padding: 7px; border: 1px solid #392d42; border-radius: 5px; background: #1c1722; }
+.shared-media-loading-item i, .shared-media-loading-item b, .shared-media-loading-item em { display: block; border-radius: 4px; background: linear-gradient(90deg, #2a2131 20%, #43334d 45%, #2a2131 70%); background-size: 200% 100%; animation: shared-media-loading 1.1s linear infinite; }
+.shared-media-loading-item i { width: 48px; height: 38px; }
+.shared-media-loading-item b { width: 100%; height: 12px; }
+.shared-media-loading-item em { width: 46px; height: 28px; }
+@keyframes shared-media-loading { to { background-position: -200% 0; } }
+.shared-media-loading-more { margin: 0; color: #a895b2; text-align: center; font-size: 10px; }
 .shared-media-empty { margin: 0; padding: 16px 8px; color: #9885a2; text-align: center; font-size: 10px; }
 .shared-media-item { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 8px; border: 1px solid #392d42; border-radius: 5px; background: #1c1722; }
 .shared-media-item.is-active { border-color: #9874ad; background: #2b2032; }
