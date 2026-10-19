@@ -4,6 +4,7 @@ import {
   ArrowRight,
   ArrowUpRight,
   AudioLines,
+  Clock3,
   Facebook,
   Github,
   Instagram,
@@ -17,6 +18,33 @@ import MeetingRoom from "./MeetingRoom";
 import { SoundToggle } from "./MediaViews";
 import { readMeetingSession, saveMeetingSession } from "./meetingSession.js";
 import { installInteractionFeedback } from "./feedback.js";
+
+function DigitalClock() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const interval = window.setInterval(() => setNow(new Date()), 1000);
+    return () => window.clearInterval(interval);
+  }, []);
+  const time = new Intl.DateTimeFormat(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).format(now);
+  const zone = new Intl.DateTimeFormat(undefined, {
+    timeZoneName: "short",
+  }).formatToParts(now).find((part) => part.type === "timeZoneName")?.value;
+  return (
+    <time className="hero-clock" dateTime={now.toISOString()} aria-label={`Local time ${time}`}>
+      <Clock3 size={17} aria-hidden="true" />
+      <span className="hero-clock-copy">
+        <small>LOCAL TIME</small>
+        <strong>{time}</strong>
+      </span>
+      {zone && <span className="hero-clock-zone">{zone}</span>}
+    </time>
+  );
+}
 
 export default function MeetingApp() {
   const [initialSession] = useState(readMeetingSession);
@@ -97,26 +125,29 @@ export default function MeetingApp() {
               <br />
               One conversation away.
             </p>
-            <button
-              className="add-meeting-button"
-              onClick={() => {
-                if (minimized) {
-                  setMinimized(false);
-                  return;
-                }
-                setOptionsOpen(true);
-                dialogRef.current.showModal();
-              }}
-            >
-              <span className="button-plus">
-                <Plus size={19} />
-              </span>
-              <span>
-                {minimized ? "Return to Meeting" : "Create a meeting"}
-              </span>
-              <ArrowUpRight size={20} />
-              <span className="button-shimmer" aria-hidden="true" />
-            </button>
+            <div className="hero-action-row">
+              <button
+                className="add-meeting-button"
+                onClick={() => {
+                  if (minimized) {
+                    setMinimized(false);
+                    return;
+                  }
+                  setOptionsOpen(true);
+                  dialogRef.current.showModal();
+                }}
+              >
+                <span className="button-plus">
+                  <Plus size={19} />
+                </span>
+                <span>
+                  {minimized ? "Return to Meeting" : "Create a meeting"}
+                </span>
+                <ArrowUpRight size={20} />
+                <span className="button-shimmer" aria-hidden="true" />
+              </button>
+              <DigitalClock />
+            </div>
           </section>
           <footer className="creator-credit">
             <span>&copy; {new Date().getFullYear()} Meeting.</span>

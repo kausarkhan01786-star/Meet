@@ -17,9 +17,10 @@ export function createPairingService({
     if (socket?.readyState === WebSocket.OPEN)
       socket.send(JSON.stringify(message));
   };
-  const memberInfo = (socket, includeLocation = false) => ({
+  const memberInfo = (socket, includeLocation = false, includeProfileImage = false) => ({
     id: socket.memberId,
     name: socket.memberName,
+    ...(includeProfileImage && socket.groupProfileImage ? { profileImage: socket.groupProfileImage } : {}),
     muted: socket.groupMuted ?? true,
     sharing: Boolean(socket.groupSharing),
     camera: Boolean(socket.groupCamera),
@@ -29,7 +30,7 @@ export function createPairingService({
     handRaised: Boolean(socket.groupHandRaised),
     ...(includeLocation && socket.groupLocation ? { location: socket.groupLocation } : {}),
   });
-  const groupState = (group, viewer) => ({ type: "group-state", ownerId: group.ownerId, chatEnabled: group.chatEnabled, muteAllLocked: group.muteAllLocked === true, recordingAllowed: group.recordingAllowed === true, recordingParticipants: [...(group.recordingMembers?.values() || [])].map(({ id, name }) => ({ id, name })), members: [...group.members.values()].map((member) => memberInfo(member, ["owner", "admin"].includes(viewer?.groupRole))), admissionRequests: [...group.admissionRequests.values()].map(({ id, name, requestedAt }) => ({ id, name, requestedAt })) });
+  const groupState = (group, viewer) => ({ type: "group-state", ownerId: group.ownerId, chatEnabled: group.chatEnabled, muteAllLocked: group.muteAllLocked === true, recordingAllowed: group.recordingAllowed === true, recordingParticipants: [...(group.recordingMembers?.values() || [])].map(({ id, name }) => ({ id, name })), studentAlreadySubmitted: Boolean(group.students?.has(viewer?.groupClientId)), ...(["owner", "admin"].includes(viewer?.groupRole) ? { students: [...(group.students?.values() || [])] } : {}), members: [...group.members.values()].map((member) => memberInfo(member, ["owner", "admin"].includes(viewer?.groupRole))), admissionRequests: [...group.admissionRequests.values()].map(({ id, name, requestedAt }) => ({ id, name, requestedAt })) });
   const clearFileUpload = (socket) => {
     if (!socket.groupFileUpload) return;
     clearTimeout(socket.groupFileUpload.timer);
@@ -196,6 +197,9 @@ export function createPairingService({
               type: "error",
               message: "Enter your name before creating or joining a meeting.",
             });
+          const profileImage = typeof message.profileImage === "string" ? message.profileImage : "";
+          if (profileImage && (profileImage.length > 12_000 || !/^data:image\/jpeg;base64,[A-Za-z0-9+/]+={0,2}$/.test(profileImage)))
+            return send(socket, { type: "error", message: "Profile images must be JPEG files smaller than 9 KB after processing." });
           const clientId = typeof message.clientId === "string" && /^[\w-]{8,80}$/.test(message.clientId) ? message.clientId : socket.groupClientId || randomUUID();
           socket.groupClientId = clientId;
           let code = message.code;
@@ -214,6 +218,7 @@ export function createPairingService({
               muteAllLocked: false,
               recordingAllowed: false,
               recordingMembers: new Map(),
+              students: new Map(),
               ownerId: null,
               blockedClientIds: new Set(),
               admissionRequests: new Map(),
@@ -261,6 +266,7 @@ export function createPairingService({
           const members = [...group.members.values()].map(memberInfo);
           socket.memberId = randomUUID();
           socket.memberName = memberName;
+          socket.groupProfileImage = profileImage;
           socket.groupRole = message.type === "group-create" ? "owner" : "member";
           socket.groupPermissions = { microphone: true, camera: true, screen: true };
           socket.groupMuteLocked = group.muteAllLocked && message.type !== "group-create";
@@ -279,15 +285,20 @@ export function createPairingService({
             members,
             limit: group.limit,
             meetingType: group.meetingType,
-            self: memberInfo(socket),
+            self: memberInfo(socket, false, true),
             ownerId: group.ownerId,
             chatEnabled: group.chatEnabled,
             muteAllLocked: group.muteAllLocked === true,
             recordingAllowed: group.recordingAllowed === true,
             recordingParticipants: [...(group.recordingMembers?.values() || [])].map(({ id, name }) => ({ id, name })),
+            studentAlreadySubmitted: group.students.has(socket.groupClientId),
+            ...(["owner", "admin"].includes(socket.groupRole) ? { students: [...group.students.values()] } : {}),
             admissionRequests: [...group.admissionRequests.values()].map(({ id, name, requestedAt }) => ({ id, name, requestedAt })),
           });
-          broadcastGroup(group, (viewer) => ({ type: "group-member-joined", member: memberInfo(socket, ["owner", "admin"].includes(viewer.groupRole)) }), socket);
+          for (const member of group.members.values()) {
+            if (member !== socket && member.groupProfileImage) send(socket, { type: "group-profile-image", id: member.memberId, profileImage: member.groupProfileImage });
+          }
+          broadcastGroup(group, (viewer) => ({ type: "group-member-joined", member: memberInfo(socket, ["owner", "admin"].includes(viewer.groupRole), true) }), socket);
         } else if (message.type === "group-admission-decision") {
           const group = groups.get(socket.groupCode);
           if (!group || !["owner", "admin"].includes(socket.groupRole)) return;
@@ -392,6 +403,28 @@ export function createPairingService({
           const group = groups.get(socket.groupCode);
           if (!group) return;
           publishGroupChat(socket, group, message);
+        } else if (message.type === "group-student-registration") {
+          const group = groups.get(socket.groupCode);
+          if (!group) return;
+          const submissionId = socket.groupClientId || socket.memberId;
+          if (group.students.has(submissionId)) return send(socket, { type: "group-student-submission-rejected", message: "You have already submitted your student details for this meeting." });
+          const fields = ["name", "roll", "section", "department"];
+          const student = {};
+          for (const field of fields) {
+            if (typeof message[field] !== "string") return send(socket, { type: "error", message: "Complete all student information fields." });
+            student[field] = message[field].trim();
+            const maxLength = field === "department" ? 100 : field === "name" ? 100 : 50;
+            if (!student[field] || student[field].length > maxLength) return send(socket, { type: "error", message: "Complete all fields and keep each entry within the allowed length." });
+          }
+          socket.studentSubmissionTimes = (socket.studentSubmissionTimes || []).filter((time) => time > Date.now() - 60_000);
+          if (socket.studentSubmissionTimes.length >= 5) return send(socket, { type: "error", message: "Please wait before submitting student information again." });
+          socket.studentSubmissionTimes.push(Date.now());
+          const entry = { id: submissionId, ...student, submittedAt: Date.now() };
+          group.students.set(submissionId, entry);
+          send(socket, { type: "group-student-submitted" });
+          for (const member of group.members.values()) {
+            if (["owner", "admin"].includes(member.groupRole)) send(member, { type: "group-students", students: [...group.students.values()] });
+          }
         } else if (message.type === "group-file-start") {
           const group = groups.get(socket.groupCode);
           if (!group || !group.chatEnabled) return send(socket, { type: "error", message: "Chat is disabled by a meeting admin." });

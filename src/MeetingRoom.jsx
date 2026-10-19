@@ -8,6 +8,8 @@ import {
   Circle,
   Copy,
   Download,
+  FileSpreadsheet,
+  GraduationCap,
   Headphones,
   Hand,
   LoaderCircle,
@@ -44,21 +46,222 @@ import { saveMeetingSession } from "./meetingSession.js";
 import { saveMeetingRecording } from "./meetingRecording.js";
 import { ChatAttachments, MemberActions, MemberLocation, MeetingReactions, ReactionControls, RichMessage, RoleBadge } from "./MeetingTools";
 
+async function downloadStudentSheet(students, meetingCode) {
+  const pageWidth = 1190;
+  const pageHeight = 1684;
+  const padding = 88;
+  const rowHeight = 62;
+  const tableTop = 270;
+  const rowsPerPage = Math.floor((pageHeight - tableTop - 110) / rowHeight);
+  const columnWidths = [300, 160, 160, pageWidth - padding * 2 - 620];
+  const headings = ["Name", "Roll", "Section", "Department"];
+  const chunks = [];
+  const wrapCell = (context, value, maxWidth) => {
+    const words = String(value ?? "").split(/\s+/);
+    const lines = [];
+    let line = "";
+    for (const word of words) {
+      const candidate = line ? `${line} ${word}` : word;
+      if (context.measureText(candidate).width <= maxWidth) line = candidate;
+      else if (!line) {
+        let clipped = word;
+        while (clipped.length > 1 && context.measureText(`${clipped}…`).width > maxWidth) clipped = clipped.slice(0, -1);
+        line = `${clipped}${clipped === word ? "" : "…"}`;
+      } else {
+        lines.push(line);
+        line = word;
+      }
+      if (lines.length === 2) break;
+    }
+    if (line && lines.length < 2) lines.push(line);
+    if (lines.length === 2 && words.join(" ").length > lines.join(" ").length) {
+      while (lines[1].length > 1 && context.measureText(`${lines[1]}…`).width > maxWidth) lines[1] = lines[1].slice(0, -1);
+      lines[1] = `${lines[1]}…`;
+    }
+    return lines;
+  };
+  const canvasBlob = (canvas) => new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("Could not render a PDF page.")), "image/jpeg", 0.92);
+  });
+
+  for (let offset = 0; offset < students.length; offset += rowsPerPage) {
+    const canvas = document.createElement("canvas");
+    canvas.width = pageWidth;
+    canvas.height = pageHeight;
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("This browser cannot create a PDF.");
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, pageWidth, pageHeight);
+    context.fillStyle = "#211a29";
+    context.fillRect(0, 0, pageWidth, 18);
+    context.fillStyle = "#241b30";
+    context.font = "bold 42px Arial, sans-serif";
+    context.fillText(offset ? "Student List (continued)" : "Student List", padding, 108);
+    context.fillStyle = "#685c70";
+    context.font = "22px Arial, sans-serif";
+    context.fillText(`Meeting ${meetingCode || ""}  •  ${students.length} students`, padding, 154);
+
+    let y = tableTop;
+    context.fillStyle = "#33253d";
+    context.fillRect(padding, y, pageWidth - padding * 2, 58);
+    context.font = 'bold 21px Arial, "Nirmala UI", sans-serif';
+    context.fillStyle = "#ffffff";
+    let x = padding;
+    headings.forEach((heading, index) => {
+      context.fillText(heading, x + 14, y + 36);
+      x += columnWidths[index];
+    });
+    y += 58;
+    const pageStudents = students.slice(offset, offset + rowsPerPage);
+    pageStudents.forEach((student, rowIndex) => {
+      context.fillStyle = rowIndex % 2 ? "#f5f2f7" : "#ffffff";
+      context.fillRect(padding, y, pageWidth - padding * 2, rowHeight);
+      context.strokeStyle = "#e5dfea";
+      context.beginPath();
+      context.moveTo(padding, y + rowHeight);
+      context.lineTo(pageWidth - padding, y + rowHeight);
+      context.stroke();
+      context.font = '20px Arial, "Nirmala UI", sans-serif';
+      context.fillStyle = "#241d29";
+      let cellX = padding;
+      [student.name, student.roll, student.section, student.department].forEach((value, columnIndex) => {
+        const lines = wrapCell(context, value, columnWidths[columnIndex] - 24);
+        lines.forEach((line, lineIndex) => context.fillText(line, cellX + 14, y + 27 + lineIndex * 24));
+        cellX += columnWidths[columnIndex];
+      });
+      y += rowHeight;
+    });
+    context.fillStyle = "#786d80";
+    context.font = "18px Arial, sans-serif";
+    context.fillText(`Page ${chunks.length + 1}`, padding, pageHeight - 54);
+    chunks.push(new Uint8Array(await (await canvasBlob(canvas)).arrayBuffer()));
+  }
+
+  const encoder = new TextEncoder();
+  const ascii = (text) => encoder.encode(text);
+  const objects = [null, ascii("<< /Type /Catalog /Pages 2 0 R >>")];
+  const pageIds = chunks.map((_, index) => 3 + index * 3);
+  objects[2] = ascii(`<< /Type /Pages /Kids [${pageIds.map((id) => `${id} 0 R`).join(" ")}] /Count ${pageIds.length} >>`);
+  chunks.forEach((jpeg, index) => {
+    const pageId = pageIds[index];
+    const imageId = pageId + 1;
+    const contentId = pageId + 2;
+    const content = ascii(`q\n595 0 0 842 0 0 cm\n/Im0 Do\nQ\n`);
+    objects[pageId] = ascii(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /XObject << /Im0 ${imageId} 0 R >> >> /Contents ${contentId} 0 R >>`);
+    objects[imageId] = [ascii(`<< /Type /XObject /Subtype /Image /Width ${pageWidth} /Height ${pageHeight} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpeg.length} >>\nstream\n`), jpeg, ascii("\nendstream")];
+    objects[contentId] = ascii(`<< /Length ${content.length} >>\nstream\n${new TextDecoder().decode(content)}endstream`);
+  });
+
+  const parts = [ascii("%PDF-1.4\n")];
+  const offsets = [0];
+  let byteLength = parts[0].length;
+  for (let id = 1; id < objects.length; id += 1) {
+    offsets[id] = byteLength;
+    const body = Array.isArray(objects[id]) ? objects[id] : [objects[id]];
+    const objectParts = [ascii(`${id} 0 obj\n`), ...body, ascii("\nendobj\n")];
+    parts.push(...objectParts);
+    byteLength += objectParts.reduce((total, part) => total + part.length, 0);
+  }
+  const xrefOffset = byteLength;
+  let xref = `xref\n0 ${objects.length}\n0000000000 65535 f \n`;
+  for (let id = 1; id < objects.length; id += 1) xref += `${String(offsets[id]).padStart(10, "0")} 00000 n \n`;
+  parts.push(ascii(`${xref}trailer\n<< /Size ${objects.length} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`));
+  const pdf = new Blob(parts, { type: "application/pdf" });
+  const url = URL.createObjectURL(pdf);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `meeting-${meetingCode || "students"}-students.pdf`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+async function encodeProfileImage(file) {
+  if (!file.type.startsWith("image/")) throw new Error("Choose an image file.");
+  if (file.size > 5 * 1024 * 1024) throw new Error("Choose an image smaller than 5 MB.");
+  const source = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error("Could not read that image."));
+    reader.readAsDataURL(file);
+  });
+  const image = new Image();
+  await new Promise((resolve, reject) => {
+    image.onload = resolve;
+    image.onerror = () => reject(new Error("Could not open that image."));
+    image.src = source;
+  });
+  for (const maxDimension of [256, 192, 144, 112]) {
+    const scale = Math.min(1, maxDimension / Math.max(image.naturalWidth, image.naturalHeight));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+    canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Could not process that image.");
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+    for (const quality of [0.8, 0.68, 0.55]) {
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
+      if (blob && blob.size <= 8_000) {
+        return await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = () => reject(new Error("Could not process that image."));
+          reader.readAsDataURL(blob);
+        });
+      }
+    }
+  }
+  throw new Error("Could not shrink that image enough. Try a different picture.");
+}
+
+function ProfileImagePicker({ profileImage, name, onSelect, onRemove, disabled, error }) {
+  return (
+    <div className="profile-image-picker">
+      <span className="profile-image-label">PROFILE IMAGE <small>OPTIONAL</small></span>
+      <div className="profile-image-actions">
+        <span className="profile-image-preview">{profileImage ? <img src={profileImage} alt="Profile preview" /> : name.trim().slice(0, 2).toUpperCase() || <Users size={18} />}</span>
+        <label className={`profile-image-upload ${disabled ? "is-disabled" : ""}`}>{profileImage ? "Change image" : "Upload image"}<input type="file" accept="image/*" disabled={disabled} onChange={onSelect} /></label>
+        {profileImage && <button type="button" className="profile-image-remove" disabled={disabled} onClick={onRemove}>Remove</button>}
+      </div>
+      <small className="profile-image-help">Optional. Meeting participants can see it; image is resized before sharing.</small>
+      {error && <small className="profile-image-error" role="alert">{error}</small>}
+    </div>
+  );
+}
+
 function ChatPanel({ group, tab, setTab, onClose, isRecording, startRecording, stopRecording, recordingMessage, savedRecording }) {
   const [draft, setDraft] = useState("");
+  const [studentFormOpen, setStudentFormOpen] = useState(false);
+  const [studentDetails, setStudentDetails] = useState({ name: "", roll: "", section: "", department: "" });
+  const [studentFeedback, setStudentFeedback] = useState("");
   const chatDisabled = group.room?.chatEnabled === false;
   const cannotSend = !group.room || !group.online || chatDisabled;
   const everyoneMicLocked = Boolean(group.room?.muteAllLocked || group.self?.micLocked || group.members.some((member) => member.micLocked));
   const bottomRef = useRef(null);
   useEffect(() => {
     setDraft("");
+    setStudentFormOpen(false);
+    setStudentDetails({ name: "", roll: "", section: "", department: "" });
+    setStudentFeedback("");
   }, [group.room?.selfId]);
+  useEffect(() => {
+    if (group.studentSubmission) setStudentFeedback(group.studentSubmission);
+  }, [group.studentSubmission]);
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }, [group.messages.length]);
   function submit(event) {
     event.preventDefault();
     if (group.sendMessage(draft)) setDraft("");
+  }
+  function submitStudentDetails() {
+    if (Object.values(studentDetails).some((value) => !value.trim())) {
+      setStudentFeedback("Please complete all four fields.");
+      return;
+    }
+    if (group.submitStudentDetails(studentDetails)) setStudentFeedback("Sending your details...");
+    else setStudentFeedback("Could not send your details. Check your meeting connection.");
   }
   return (
     <aside className="meeting-sidebar" aria-label="Meeting sidebar">
@@ -170,7 +373,18 @@ function ChatPanel({ group, tab, setTab, onClose, isRecording, startRecording, s
                 }
               }}
             />
-            <ChatAttachments disabled={cannotSend} onEmoji={(emoji) => setDraft((current) => (current + emoji).slice(0, 2000))} onSendFile={group.sendFile} />
+            {studentFormOpen && (
+              <div className="student-registration-form" aria-label="Student information">
+                <div className="student-form-heading"><strong>Student information</strong><button type="button" className="m-icon" aria-label="Close student form" title="Close student form" onClick={() => setStudentFormOpen(false)}><X size={14} /></button></div>
+                <p>Owner/Admin can view and download these details for this meeting. They are cleared when the meeting ends.</p>
+                <div className="student-form-fields">
+                  {[['name', 'Name'], ['roll', 'Roll'], ['section', 'Section'], ['department', 'Department']].map(([field, label]) => <label key={field}>{label}<input disabled={group.studentSubmitted || group.studentSubmission === "Sending your details..."} maxLength={field === "department" || field === "name" ? 100 : 50} value={studentDetails[field]} onChange={(event) => setStudentDetails((current) => ({ ...current, [field]: event.target.value }))} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); submitStudentDetails(); } }} /></label>)}
+                </div>
+                <button type="button" className="student-submit-button" disabled={!group.room || !group.online || group.studentSubmitted || group.studentSubmission === "Sending your details..."} onClick={submitStudentDetails}>{group.studentSubmitted ? "Already submitted" : "Submit details"}</button>
+                {studentFeedback && <small className="student-feedback" role="status">{studentFeedback}</small>}
+              </div>
+            )}
+            <ChatAttachments disabled={cannotSend} studentDisabled={!group.room || !group.online} onStudentClick={() => { setStudentFeedback(""); setStudentFormOpen((open) => !open); }} onEmoji={(emoji) => setDraft((current) => (current + emoji).slice(0, 2000))} onSendFile={group.sendFile} />
             <div>
               <span>
                 <LockKeyhole size={11} /> Only in this meeting
@@ -196,7 +410,7 @@ function ChatPanel({ group, tab, setTab, onClose, isRecording, startRecording, s
           ) : (
             <>
               <div className="person-row">
-                <span className="person-avatar">YOU</span>
+                <span className="person-avatar">{group.self?.profileImage ? <img src={group.self.profileImage} alt="" /> : "YOU"}</span>
                 <div>
                   <strong>You <RoleBadge role={group.self?.role} /></strong>
                   <small>
@@ -209,7 +423,7 @@ function ChatPanel({ group, tab, setTab, onClose, isRecording, startRecording, s
               {group.members.map((member) => (
                 <div className="person-row" key={member.id}>
                   <span className="person-avatar">
-                    {member.name.slice(0, 2).toUpperCase()}
+                    {member.profileImage ? <img src={member.profileImage} alt="" /> : member.name.slice(0, 2).toUpperCase()}
                   </span>
                   <div>
                     <strong>{member.name} <RoleBadge role={member.role} /></strong>
@@ -239,6 +453,12 @@ function ChatPanel({ group, tab, setTab, onClose, isRecording, startRecording, s
         </div>
       ) : (
         <div className="others-panel">
+          {group.isAdmin && (
+            <section className="student-sheet-section">
+              <div className="student-sheet-heading"><div><h3>Student list</h3><small>{group.students.length} student{group.students.length === 1 ? "" : "s"} submitted</small></div><button className="recording-download" type="button" disabled={!group.students.length} onClick={() => downloadStudentSheet(group.students, group.room?.code)}><FileSpreadsheet size={14} /> Download PDF</button></div>
+              {group.students.length ? <div className="student-sheet-wrap"><table className="student-sheet"><thead><tr><th>Name</th><th>Roll</th><th>Section</th><th>Department</th></tr></thead><tbody>{group.students.map((student) => <tr key={student.id}><td>{student.name}</td><td>{student.roll}</td><td>{student.section}</td><td>{student.department}</td></tr>)}</tbody></table></div> : <p className="student-sheet-empty">No student details submitted yet.</p>}
+            </section>
+          )}
           <h3>Meeting recording</h3>
           <p>Record the meeting screen and audio, then save the video on this device.</p>
           {group.self?.role === "owner" && <label className="recording-permission-setting"><span><strong>Allow meeting recording</strong><small>Anyone in this meeting can record and save a local copy.</small></span><input type="checkbox" checked={group.room?.recordingAllowed === true} onChange={(event) => group.adminAction("recording-permission", { enabled: event.target.checked })} /></label>}
@@ -311,6 +531,9 @@ export default function MeetingRoom({
   const single = meetingType === "single";
   const [mode, setMode] = useState(initialSession.mode || null);
   const [name, setName] = useState(initialSession.name || "");
+  const [profileImage, setProfileImage] = useState("");
+  const [profileImageError, setProfileImageError] = useState("");
+  const [profileImageBusy, setProfileImageBusy] = useState(false);
   const [code, setCode] = useState(
     initialSession.roomCode || initialSession.code || "",
   );
@@ -340,6 +563,24 @@ export default function MeetingRoom({
   const recorderSessionRef = useRef(null);
   const recordingUrlRef = useRef(null);
   const savedRoomCode = useRef(initialSession.roomCode || "");
+  async function selectProfileImage(event) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    setProfileImageError("");
+    setProfileImageBusy(true);
+    try {
+      setProfileImage(await encodeProfileImage(file));
+    } catch (failure) {
+      setProfileImageError(failure.message || "Could not process that image.");
+    } finally {
+      setProfileImageBusy(false);
+    }
+  }
+  function removeProfileImage() {
+    setProfileImage("");
+    setProfileImageError("");
+  }
   useEffect(() => {
     const currentRoomId = group.room?.selfId || null;
     const currentIds = new Set(group.messages.map((message) => message.id));
@@ -485,7 +726,7 @@ export default function MeetingRoom({
     };
   }, [minimized, previewStream]);
   useEffect(() => {
-    if (!autoEnter || needsReconnect) return;
+    if (!autoEnter || needsReconnect || profileImageBusy) return;
     if (
       mode === "create" &&
       name.trim() &&
@@ -494,7 +735,7 @@ export default function MeetingRoom({
       !creating.current
     ) {
       creating.current = true;
-      group.enter("create", name.trim(), "");
+      group.enter("create", name.trim(), "", profileImage);
     }
     if (
       mode === "join" &&
@@ -506,7 +747,7 @@ export default function MeetingRoom({
       attemptedCode.current !== code
     ) {
       attemptedCode.current = code;
-      group.enter("join", name.trim(), code);
+      group.enter("join", name.trim(), code, profileImage);
     }
   }, [
     mode,
@@ -517,6 +758,8 @@ export default function MeetingRoom({
     name,
     autoEnter,
     needsReconnect,
+    profileImage,
+    profileImageBusy,
   ]);
   useEffect(() => {
     if (!group.room) {
@@ -570,6 +813,7 @@ export default function MeetingRoom({
         stream={group.localCamera}
         audioStream={group.localAudio}
         name={name.trim() || (mode === "create" ? "Host" : "Guest")}
+        profileImage={group.self?.profileImage || profileImage}
         local
         enabled={group.cameraOn}
         muted={group.muted}
@@ -581,6 +825,7 @@ export default function MeetingRoom({
           stream={group.cameraStreams[member.id]}
           audioStream={group.streams[member.id]}
           name={member.name}
+          profileImage={member.profileImage}
           enabled={member.camera}
           muted={member.muted}
           handRaised={member.handRaised}
@@ -713,7 +958,7 @@ export default function MeetingRoom({
                             ? "Your voices are connected. Your screens are next."
                             : "A conversation is one code away."
                           : mode === "create"
-                            ? "Preparing your private room..."
+                            ? group.joining ? "Preparing your private room..." : "Add an optional profile image, then create your private room."
                             : "Enter a six-digit code to connect."}
                     </p>
                   </div>
@@ -736,13 +981,14 @@ export default function MeetingRoom({
                   value={name}
                   onChange={(event) => setName(event.target.value)}
                 />
+                <ProfileImagePicker profileImage={profileImage} name={name} disabled={profileImageBusy} error={profileImageBusy ? "Processing image..." : profileImageError} onSelect={selectProfileImage} onRemove={removeProfileImage} />
                 <div className="entry-choice-grid">
                   <button
                     className="entry-choice"
-                    disabled={!name.trim()}
+                    disabled={!name.trim() || profileImageBusy}
                     onClick={() => {
                       creating.current = false;
-                      setAutoEnter(true);
+                      setAutoEnter(false);
                       setMode("create");
                     }}
                   >
@@ -765,7 +1011,7 @@ export default function MeetingRoom({
                   </button>
                   <button
                     className="entry-choice receive-entry"
-                    disabled={!name.trim()}
+                    disabled={!name.trim() || profileImageBusy}
                     onClick={() => {
                       setAutoEnter(true);
                       setMode("join");
@@ -815,7 +1061,7 @@ export default function MeetingRoom({
                         setCode(previousCode);
                         setNeedsReconnect(false);
                         setAutoEnter(true);
-                        group.enter("join", name.trim(), previousCode);
+                        group.enter("join", name.trim(), previousCode, profileImage);
                       }}
                     >
                       <Phone size={16} /> Reconnect to meeting
@@ -829,10 +1075,10 @@ export default function MeetingRoom({
                   </div>
                 ) : mode === "join" ? (
                   <form
-                    className="receive-call-form"
+                    className="receive-call-form join-meeting-form"
                     onSubmit={(event) => {
                       event.preventDefault();
-                      group.enter("join", name.trim(), code);
+                      group.enter("join", name.trim(), code, profileImage);
                     }}
                   >
                     <div className="receive-call-symbol">
@@ -861,6 +1107,7 @@ export default function MeetingRoom({
                       disabled={group.joining || group.admissionStatus === "pending"}
                       onChange={(event) => setName(event.target.value)}
                     />
+                    <ProfileImagePicker profileImage={profileImage} name={name} disabled={group.joining || group.admissionStatus === "pending" || profileImageBusy} error={profileImageBusy ? "Processing image..." : profileImageError} onSelect={selectProfileImage} onRemove={removeProfileImage} />
                     <label htmlFor="meeting-code">
                       {single ? "PAIRING CODE" : "MEETING CODE"}
                     </label>
@@ -888,6 +1135,7 @@ export default function MeetingRoom({
                         !group.online ||
                         group.joining ||
                         group.admissionStatus === "pending" ||
+                        profileImageBusy ||
                         !name.trim() ||
                         code.length !== 6
                       }
@@ -909,7 +1157,7 @@ export default function MeetingRoom({
                     className="receive-call-form"
                     onSubmit={(event) => {
                       event.preventDefault();
-                      group.enter("create", name.trim(), "");
+                      group.enter("create", name.trim(), "", profileImage);
                     }}
                   >
                     <div className="receive-call-symbol">
@@ -931,11 +1179,12 @@ export default function MeetingRoom({
                       disabled={group.joining}
                       onChange={(event) => setName(event.target.value)}
                     />
+                    <ProfileImagePicker profileImage={profileImage} name={name} disabled={group.joining || profileImageBusy} error={profileImageBusy ? "Processing image..." : profileImageError} onSelect={selectProfileImage} onRemove={removeProfileImage} />
                     <p className="location-sharing-note">Your browser will ask to share your location. Meeting admins can view it on a map.</p>
                     <button
                       className="connect-call-button"
                       disabled={
-                        !group.online || group.joining || !name.trim()
+                        !group.online || group.joining || profileImageBusy || !name.trim()
                       }
                     >
                       {group.joining ? (

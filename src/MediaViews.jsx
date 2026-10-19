@@ -109,6 +109,7 @@ export function CameraTile({
   stream,
   audioStream,
   name,
+  profileImage = "",
   local = false,
   enabled = false,
   muted = false,
@@ -167,7 +168,7 @@ export function CameraTile({
       ) : (
         <div className="camera-placeholder">
           <span>
-            {name.slice(0, 2).toUpperCase()}
+            {profileImage ? <img src={profileImage} alt="" /> : name.slice(0, 2).toUpperCase()}
             <i />
             <i />
             <i />

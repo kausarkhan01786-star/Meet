@@ -44,6 +44,9 @@ export function useGroup({ meetingType = "group" } = {}) {
   const [reactions, setReactions] = useState([]);
   const [recordingParticipants, setRecordingParticipants] = useState([]);
   const [recordingStopSignal, setRecordingStopSignal] = useState(0);
+  const [students, setStudents] = useState([]);
+  const [studentSubmission, setStudentSubmission] = useState("");
+  const [studentSubmitted, setStudentSubmitted] = useState(false);
   const [admissionRequests, setAdmissionRequests] = useState([]);
   const [admissionStatus, setAdmissionStatus] = useState(null);
   const [retry, setRetry] = useState(0);
@@ -54,6 +57,7 @@ export function useGroup({ meetingType = "group" } = {}) {
   const admissionRef = useRef(null);
   const locationCaptureRef = useRef(null);
   const pendingRecordingPermissionRef = useRef(null);
+  const studentSubmissionTimeoutRef = useRef(null);
   const micRef = useRef(null);
   const screenRef = useRef(null);
   const cameraRef = useRef(null);
@@ -88,6 +92,8 @@ export function useGroup({ meetingType = "group" } = {}) {
   };
   const release = () => {
     generation.current += 1;
+    clearTimeout(studentSubmissionTimeoutRef.current);
+    studentSubmissionTimeoutRef.current = null;
     locationCaptureRef.current = null;
     pendingRecordingPermissionRef.current = null;
     for (const id of peersRef.current.keys()) closePeer(id);
@@ -125,6 +131,9 @@ export function useGroup({ meetingType = "group" } = {}) {
     setReactions([]);
     setRecordingParticipants([]);
     setAdmissionRequests([]);
+    setStudents([]);
+    setStudentSubmission("");
+    setStudentSubmitted(false);
     setAdmissionStatus(null);
     admissionRef.current = null;
   };
@@ -263,6 +272,9 @@ export function useGroup({ meetingType = "group" } = {}) {
             setSelf(message.self);
             setAdmissionRequests(message.admissionRequests || []);
             setRecordingParticipants(message.recordingParticipants || []);
+            setStudents(message.students || []);
+            setStudentSubmitted(message.studentAlreadySubmitted === true);
+            setStudentSubmission(message.studentAlreadySubmitted ? "You have already submitted your student details for this meeting." : "");
             const locationCapture = locationCaptureRef.current;
             if (locationCapture) locationCapture.promise.then((coordinates) => {
               if (coordinates && locationCaptureRef.current === locationCapture && roomRef.current?.selfId === message.selfId) send({ type: "group-location", ...coordinates });
@@ -289,13 +301,16 @@ export function useGroup({ meetingType = "group" } = {}) {
           } else if (message.type === "group-state" && roomRef.current) {
             const own = message.members.find((member) => member.id === roomRef.current.selfId);
             if (!own) return;
-            roomRef.current = { ...roomRef.current, ownerId: message.ownerId, chatEnabled: message.chatEnabled, muteAllLocked: message.muteAllLocked === true, recordingAllowed: message.recordingAllowed === true, self: own };
+            roomRef.current = { ...roomRef.current, ownerId: message.ownerId, chatEnabled: message.chatEnabled, muteAllLocked: message.muteAllLocked === true, recordingAllowed: message.recordingAllowed === true, self: { ...own, profileImage: own.profileImage || roomRef.current.self?.profileImage } };
             setRoom(roomRef.current);
-            setSelf(own);
+            setSelf(roomRef.current.self);
             setAdmissionRequests(message.admissionRequests || []);
             setRecordingParticipants(message.recordingParticipants || []);
+            setStudents(message.students || []);
+            setStudentSubmitted(message.studentAlreadySubmitted === true);
+            if (message.studentAlreadySubmitted) setStudentSubmission("You have already submitted your student details for this meeting.");
             if (pendingRecordingPermissionRef.current && message.recordingAllowed === pendingRecordingPermissionRef.current.enabled) pendingRecordingPermissionRef.current = null;
-            setMembers(message.members.filter((member) => member.id !== own.id));
+            setMembers((current) => message.members.filter((member) => member.id !== own.id).map((member) => ({ ...member, profileImage: member.profileImage || current.find((existing) => existing.id === member.id)?.profileImage })));
             await applyPermissions(own);
           } else if (message.type === "group-admission-pending" && !roomRef.current) {
             micRef.current?.getTracks().forEach((track) => track.stop());
@@ -329,6 +344,24 @@ export function useGroup({ meetingType = "group" } = {}) {
             setError(message.message || "You were removed from the meeting.");
           } else if (message.type === "group-reaction" && roomRef.current) {
             setReactions((current) => [...current.slice(-11), { ...message, expiresAt: Date.now() + 4500 }]);
+          } else if (message.type === "group-students" && roomRef.current && ["owner", "admin"].includes(roomRef.current.self?.role)) {
+            setStudents(Array.isArray(message.students) ? message.students : []);
+          } else if (message.type === "group-student-submitted" && roomRef.current) {
+            clearTimeout(studentSubmissionTimeoutRef.current);
+            studentSubmissionTimeoutRef.current = null;
+            setStudentSubmitted(true);
+            setStudentSubmission("Student details sent to the meeting owner/admin.");
+          } else if (message.type === "group-student-submission-rejected" && roomRef.current) {
+            clearTimeout(studentSubmissionTimeoutRef.current);
+            studentSubmissionTimeoutRef.current = null;
+            setStudentSubmitted(true);
+            setStudentSubmission(message.message || "You have already submitted your student details for this meeting.");
+          } else if (message.type === "group-profile-image" && roomRef.current && typeof message.profileImage === "string") {
+            if (message.id === roomRef.current.selfId) {
+              roomRef.current = { ...roomRef.current, self: { ...roomRef.current.self, profileImage: message.profileImage } };
+              setRoom(roomRef.current);
+              setSelf(roomRef.current.self);
+            } else setMembers((current) => current.map((member) => member.id === message.id ? { ...member, profileImage: message.profileImage } : member));
           } else if (message.type === "group-recording-stop" && roomRef.current) {
             setRecordingStopSignal((current) => current + 1);
           } else if (message.type === "group-chat" && roomRef.current) {
@@ -423,6 +456,11 @@ export function useGroup({ meetingType = "group" } = {}) {
                 ]);
             }
           } else if (message.type === "error") {
+            if (studentSubmissionTimeoutRef.current) {
+              clearTimeout(studentSubmissionTimeoutRef.current);
+              studentSubmissionTimeoutRef.current = null;
+              setStudentSubmission(message.message || "The meeting server could not accept these details.");
+            }
             const pendingRecordingPermission = pendingRecordingPermissionRef.current;
             pendingRecordingPermissionRef.current = null;
             if (!roomRef.current) {
@@ -447,7 +485,7 @@ export function useGroup({ meetingType = "group" } = {}) {
     };
   }, [retry]);
 
-  async function enter(mode, name, code) {
+  async function enter(mode, name, code, profileImage = "") {
     if (!online || busyRef.current || enteringRef.current || roomRef.current)
       return;
     const displayName = typeof name === "string" ? name.trim() : "";
@@ -477,7 +515,7 @@ export function useGroup({ meetingType = "group" } = {}) {
         }
       }),
     };
-    admissionRef.current = { name: displayName, code, meetingType, clientId };
+    admissionRef.current = { name: displayName, code, meetingType, clientId, ...(profileImage ? { profileImage } : {}) };
     setJoining(true);
     setError("");
     let voice;
@@ -509,6 +547,7 @@ export function useGroup({ meetingType = "group" } = {}) {
           code,
           meetingType,
           clientId,
+          ...(profileImage ? { profileImage } : {}),
         })
       )
         throw new Error("Server is offline. Reconnect and try again.");
@@ -764,6 +803,21 @@ export function useGroup({ meetingType = "group" } = {}) {
   function reportRecording(active) {
     if (roomRef.current) send({ type: "group-recording", active });
   }
+  function submitStudentDetails(details) {
+    if (!roomRef.current || !online) return false;
+    clearTimeout(studentSubmissionTimeoutRef.current);
+    const sent = send({ type: "group-student-registration", ...details });
+    if (!sent) {
+      setStudentSubmission("Could not reach the meeting server. Check your connection and try again.");
+      return false;
+    }
+    setStudentSubmission("Sending your details...");
+    studentSubmissionTimeoutRef.current = setTimeout(() => {
+      setStudentSubmission("No server confirmation received. Your details may not have been saved. Restart the meeting server and try again.");
+      studentSubmissionTimeoutRef.current = null;
+    }, 12_000);
+    return true;
+  }
   return {
     online,
     joining,
@@ -798,6 +852,10 @@ export function useGroup({ meetingType = "group" } = {}) {
     reactions,
     recordingParticipants,
     recordingStopSignal,
+    students,
+    studentSubmission,
+    studentSubmitted,
+    submitStudentDetails,
     reportRecording,
     admissionRequests,
     admissionStatus,
