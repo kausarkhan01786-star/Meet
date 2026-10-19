@@ -1,5 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
-import { Pause, Play, Volume2, VolumeX } from "lucide-react";
+import { Pause, Play, Square, Volume2, VolumeX } from "lucide-react";
 
 let youtubeApiPromise;
 
