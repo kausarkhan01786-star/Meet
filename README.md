@@ -1,6 +1,6 @@
 # Meeting
 
-A browser meeting app with an interactive Three.js Earth hero, animated meeting choices, two-way voice and camera video, simultaneous screen sharing, and in-room chat. Single meetings support two people; group rooms accept up to 1,000 members. This is only a server admission limit: group calls still use a full mesh of browser WebRTC connections and are not suitable for 1,000 active media participants without an SFU. Different networks require public HTTPS hosting and a working TURN relay. This checkout is not automatically a publicly reachable website. The home copyright credit highlights the creator, **Kausar mia**.
+A browser meeting app with an interactive Three.js Earth home, two-way voice and camera video, simultaneous screen sharing, shared audio/video playback, in-room chat, moderation, and optional local recording. Single meetings support two people; group rooms accept up to 1,000 members. This is only a server admission limit: group calls still use a full mesh of browser WebRTC connections and are not suitable for 1,000 active media participants without an SFU. Different networks require public HTTPS hosting and a working TURN relay. This checkout is not automatically a publicly reachable website. The home copyright credit highlights the creator, **Kausar mia**.
 
 ## Run
 
@@ -20,10 +20,10 @@ On Windows PowerShell, use `npm.cmd` instead of `npm` if script execution policy
 
 ## Group Voice And Screens
 
-The hero contains **Add Meeting**, which reveals **Single meeting** and **Group meeting** cards. Mouse/touch drag rotates the globe. Motion respects the reduced-motion preference; WebGL-unavailable browsers see a bitmap fallback.
+The home page contains **Create a meeting**, which opens **Create new meeting** and **Join meeting** choices. Both currently open the Group workflow. Mouse/touch drag rotates the globe. Motion respects the reduced-motion preference; WebGL-unavailable browsers see a bitmap fallback.
 
-1. Open **Add Meeting > Group meeting**, enter your required display name, select **Create group**, and allow microphone access. The fullscreen room displays its six-digit group code. A nonblank name is required for both creating and joining, enforced by the UI and server.
-2. Give the website address and code only to the intended people. They select **Add Meeting > Group meeting > Add group**. Entering all six digits starts joining automatically; **Connect** can retry a rejected code.
+1. Select **Create a meeting > Create new meeting**, enter your display name and an optional profile image, then press **Create meeting**. Allow microphone access when prompted. The room displays its six-digit group code. Names must contain at least four characters after trimming and must not contain numbers, including Bengali or other Unicode numbers. The inputs filter numbers, and client/server validation rejects invalid names.
+2. Share the code or use **Copy meeting code** / **Share meeting link**. Guests choose **Join meeting**, enter a valid name and the six-digit code, or open the shared `?join=123456` URL. Entering all six digits can start joining automatically; **Connect** can retry a rejected code. Share links still require a valid name and admission checks.
 3. Everyone can talk and listen at the same time. Use the microphone button to mute/unmute yourself and the speaker button to mute/unmute playback on your device. If autoplay is blocked, press the member's **Hear** button.
 4. Any member using a supported desktop Chrome/Edge browser can press **Share screen**. Multiple members can share simultaneously; their screen tiles appear separately with fullscreen controls. Screen sharing here sends video only; voices are carried by each member's microphone. Phones can join voice and view screens, but mobile browser screen capture is generally unavailable.
 5. **Stop sharing** ends only your screen, not the voice call. Clicking **Meeting home** or the active meeting header returns to the hero while keeping the call, microphone, screen sharing, chat, and peer connections mounted. A corner call dock restores the same room and offers mic mute and an explicit end button. The hero's **Return to Meeting** button also restores it. Only one meeting is active at a time.
@@ -31,9 +31,20 @@ The hero contains **Add Meeting**, which reveals **Single meeting** and **Group 
 
 Groups admit **up to 1,000 members including the creator**, using the existing full mesh of browser WebRTC connections. This limit does not mean a 1,000-person call will work reliably: each member creates a separate connection to every other member, so browser CPU, memory, signaling traffic, and upload bandwidth grow rapidly with group size. Large meetings need an SFU media server, which this app does not implement. Use small groups for active audio/video until an SFU is integrated.
 
-A group code remains valid while at least one member stays connected. The creator leaving does not end the room for others; the last member leaving deletes it. Names are display labels, not verified identities. No moderator, member-kicking, recording, or account authentication is provided. If microphone permission is denied, you can still join and view; press **Unmute** after allowing permission to speak.
+A group code remains valid while at least one member stays connected. The creator leaving does not end the room for others; the last member leaving deletes it. Owners/admins have moderation controls, and the owner can allow local recording. Names are display labels, not verified identities; account authentication is not provided. If microphone permission is denied, you can still join and view; press **Unmute** after allowing permission to speak.
 
 Groups and Single meetings share the same HTTPS/STUN/TURN infrastructure. **Local private-IP links only work on the local network.** Browser verification used generated microphones and screens; real physical microphones, mobile capture permissions and public/TURN connectivity still require real-device testing.
+
+## Room Tools And Layout
+
+- **People:** participant roles, microphone status, raised hands and a first-raised-first speaking queue. Owners/admins can invite the next speaker and mute participants.
+- **Moderation:** participant menus provide microphone, camera and screen-sharing permissions, immediate mute, and removal. Only the owner can grant/revoke admin access. Room chat and recording also have permission controls.
+- **Permission:** owners/admins can accept or reject pending rejoin requests. Not every initial join requires approval; a pending request shows a waiting state instead of starting capture immediately.
+- **Reactions:** a mobile-contained picker sends room reactions that float upward within the call stage. Raise/lower hand is separate from emoji reactions.
+- **Chat tools:** emoji, file attachments, polls and student-information submission. Admins can view submitted name, roll, section and department details and download the student list as a PDF under **Others**.
+- **Location:** joining can prompt for browser location permission. Admin participant tools can open available coordinates in Google Maps; location is unavailable if permission is denied or unsupported. Coordinates travel through the signaling server, not an end-to-end encrypted channel.
+- **Rescue:** an optional weak-network mode adjusts media transport settings. It does not replace TURN or make a large full-mesh call scalable.
+- **Participant cards:** centered, wrapping 16:9 tiles that grow with the available width. Mobile uses tighter spacing, avatars and captions; row counts depend on available space and participant count, not a fixed two-column or count-specific layout. Shared screens retain their own containment and fullscreen controls.
 
 ## Camera Video Calls
 
@@ -49,21 +60,43 @@ Camera verification used generated video over real WebRTC, checked decoded remot
 
 ## Shared Media
 
+Open **Shared audio and video** in the call toolbar. The left dock has Audio playlist, Video playlist and Direct media link modes. Its heading, permission toggle, mode icons, search and playlist heading stay fixed while only the result list scrolls.
+
+Search is submitted with Enter or the search button; autocomplete suggestions are disabled. Refresh loads another discovery playlist, and **See more** appends the next page when available. Searches preserve existing results when a later request fails and show the error without requiring the room to close.
+
 Owners and admins can play, seek, pause/resume, and stop shared audio or video. **Allow members to manage media** grants the same shared controls to members; turning it off removes those controls immediately. The signaling server enforces this permission. Local mute/pause affects only the listener's device and remains available without management permission.
+
+Every newly started media item begins at **50% volume**. Listeners with access to the volume slider can adjust it for that item; a new item starts at 50% again rather than restoring an older saved volume.
 
 YouTube and direct media use the app's playback controls instead of native player controls. YouTube keyboard and iframe pointer controls are disabled. YouTube may still show its title, branding, recommendations, or other provider overlays; its official embedding options do not guarantee an overlay-free player. The app does not crop or cover those overlays.
 
+YouTube search and YouTube/Music link lookup require **YouTube Data API v3** and a server-side `YOUTUBE_API_KEY`. Configure it in the hosting provider's secrets or your untracked local environment, then restart the server. Do not commit the key or expose it in a `VITE_` variable. The server caches search results and reports missing configuration, quota exhaustion and provider errors. A pasted YouTube link still needs lookup access and an embeddable item; it does not bypass provider restrictions.
+
+Direct non-YouTube links must point to a browser-playable audio/video resource, not an ordinary web page. HTTPS pages may block insecure HTTP resources, and the provider must permit playback in the browser. Each member streams shared media separately from its provider; media files are not redistributed through the meeting's WebRTC mesh.
+
+## Local Recording
+
+In **Others**, the owner can enable **Allow meeting recording**. A participant can then select **Record meeting**, choose the meeting tab/window/screen in the browser prompt, and use **Stop & save** followed by **Download recording**.
+
+Recording uses `getDisplayMedia`, Web Audio and `MediaRecorder`. It combines the selected screen video with local/remote meeting microphone tracks and saves a WebM file in that browser's IndexedDB. System/tab audio and shared music are not explicitly mixed into this recording. Availability depends on browser capture/recording support; do not assume mobile browsers can record a screen.
+
+The room displays active recorders and attempts a local spoken announcement when recording starts. Permission revocation or leaving the room stops an active app recording. Files stay on the recording device, are not uploaded to the signaling server, and can be lost if browser storage is cleared. This permission cannot prevent someone from using external recording software.
+
 ## Meeting Chat
 
-The right-side panel has Chat and People tabs. On small screens, the chat button opens an overlay drawer. Messages are limited to 2,000 characters, sent only to members of the same room, and rendered as plain text. The server assigns sender identity and limits message bursts. Chat travels over the signaling connection (TLS on HTTPS deployments); unlike WebRTC media, it is not end-to-end encrypted from the signaling server. No server-side history is stored. Each browser keeps at most 200 messages until leaving, so late joiners do not receive earlier messages. Display names are not verified identities.
+The right-side panel has **Chat**, **People**, an admin **Permission** tab for rejoin requests, and **Others**. On small screens, the chat button opens an overlay drawer. Text messages are limited to 2,000 characters; file attachments are limited to 5 MB. Messages stay within the room, text is not rendered as arbitrary HTML, and the server assigns sender identity and rate-limits messages/uploads. Owners/admins can disable room chat.
+
+Chat, file attachments, polls and student submissions travel over the signaling connection (TLS on HTTPS deployments); unlike WebRTC media, they are not end-to-end encrypted from the signaling server. No server-side chat history is persisted. Each browser keeps at most 200 messages until leaving, so late joiners do not receive earlier messages. Display names are not verified identities.
 
 ## Refresh And Sound Feedback
 
+The home clock displays the device's local time in **12-hour format with AM/PM**, including seconds and a timezone label. It updates once per second; it is not a server-synchronized clock.
+
 The current Single/Group view, create/receive form, display name, entered code, chat tab/drawer, meeting picker and minimized state are saved in this tab's `sessionStorage`. Refresh returns to that view instead of resetting to the hero. This does not preserve a live WebRTC connection, microphone, camera, screen capture, or chat history across a document reload.
 
-If an active call was interrupted by refresh, the same meeting page shows **Reconnect to meeting** with the previous code. Reconnection is explicit: refresh never silently requests microphone/camera/screen permissions. Rejoining succeeds only while the room still exists and has capacity; if everyone left or the server restarted, return to meeting options and create a new room. Camera and screen sharing remain off until explicitly enabled again. A refreshed minimized call says **Reconnect needed**, not connected.
+If an active call was interrupted by refresh, the same meeting page shows **Reconnect to meeting** with the previous code. Reconnection is explicit: refresh never silently requests microphone/camera/screen permissions. Rejoining succeeds only while the room still exists, has capacity, and any required owner/admin approval is granted; if everyone left or the server restarted, return to meeting options and create a new room. Camera and screen sharing remain off until explicitly enabled again. A refreshed minimized call says **Reconnect needed**, not connected.
 
-Short locally synthesized sound cues play for enabled button/card/link clicks, actual call connection, call/member departure, and server-confirmed sent messages. Sound requires browser user interaction; autoplay policy or device mute can suppress it. The speaker icon in the hero/header toggles **interface sounds**, independently from meeting speaker mute, and remembers the preference in `localStorage`. These cues are not added to outgoing WebRTC audio tracks; headphones avoid acoustic pickup by a physical microphone. No external audio assets are downloaded.
+Short locally synthesized sound cues play for enabled button/card/link clicks, actual call connection, call/member departure, server-confirmed sent messages, and pending admission requests for admins. Sound requires browser user interaction; autoplay policy or device mute can suppress it. The speaker icon in the hero/header toggles **interface sounds**, independently from meeting speaker mute, and remembers the preference in `localStorage`. These cues are not added to outgoing WebRTC audio tracks; headphones avoid acoustic pickup by a physical microphone. No external audio assets are downloaded.
 
 ## Public Deployment
 
@@ -87,6 +120,7 @@ For local configuration, use `.env.example` as the template for an untracked `.e
 | `TURN_SECRET`                    | coturn shared secret; server generates one-hour HMAC credentials, never sends the shared secret                                          |
 | `TURN_USERNAME`, `TURN_PASSWORD` | Alternative provider credentials, necessarily delivered to the WebRTC client                                                             |
 | `ICE_RELAY_ONLY`                 | `true` to force TURN for verification; requires working relay configuration                                                              |
+| `YOUTUBE_API_KEY`                | Server-only YouTube Data API v3 key for media search and YouTube link lookup; provider quota and embedding restrictions still apply          |
 | `PORT`, `HTTPS_PORT`             | Node HTTP and optional local HTTPS ports                                                                                                 |
 
 Verify from real separate networks, for example PC broadband and phone mobile data. Temporarily enable `ICE_RELAY_ONLY=true`, restart, create a **new** session, and confirm video and voice. This tests TURN rather than accidentally succeeding through LAN/direct candidates. The app loads fresh ICE credentials on each connection. Set this back to `false` to allow efficient direct connections. No real TURN credentials or public hosting are supplied in this repository.
@@ -97,12 +131,11 @@ Treat the code as temporary screen access: give it only to the intended person a
 
 The ICE configuration endpoint provides client-usable TURN credentials. Anyone able to access it can consume relay bandwidth; put it and the rest of the app behind your access control and enforce TURN quotas. Shared secrets remain server-side, but short-lived credentials can still be used until they expire. Static provider credentials are visible to authorized browser clients by design. Configure provider usage limits and rotate credentials when needed.
 
-## Single Meetings
+## Single Meeting Support
 
-1. Select **Add Meeting > Single meeting**, enter your required display name, then choose **Create call** or **Receive call**. Blank or whitespace-only names cannot create or join a call. Allow microphone access; the created room shows **Make room for another screen.** and a six-digit pairing code.
-2. The other participant opens the same website and chooses **Single meeting > Receive call**. Filling all six digits starts connecting automatically; no screen capture is required to talk.
-3. Both participants can speak and listen, mute microphones/speakers, use chat, and later share a screen from a supported desktop browser. A Single meeting admits at most two people. Its code cannot be used in Group mode.
-4. Stopping screen sharing preserves the voice call. The red leave button releases all capture. The remaining person can wait for a replacement participant; the room is deleted when empty.
+The shared room component and signaling protocol still support Single meetings with a two-person limit and separate code validation. The current home chooser creates/joins Group rooms; it does not expose a separate Single-mode button. Restored Single sessions still use the Single room component.
+
+Single meetings require the same valid names and secure browser context, provide two-way microphone voice, opt-in cameras, chat and later screen sharing, and do not require screen capture to start voice. A Single code cannot be used in Group mode. Stopping screen sharing preserves voice; leaving releases capture, and an empty room is deleted.
 
 Meeting codes last while a participant remains connected. All sessions and chat are in memory and disappear on server restart. The old one-way casting protocol remains supported server-side for compatibility, but the new Single meeting UI uses two-way voice rooms.
 
@@ -125,7 +158,10 @@ Keep the private certificate file private. It is renewed when the detected LAN a
 - Multiple simultaneous screens, screen fullscreen, microphone and speaker mute.
 - Shared-screen stages are capped at 1540px wide and 725px high, shrink to the available viewport, and contain the video without stretching. The explicit fullscreen control can still expand a screen to the browser's fullscreen view.
 - Home minimizes an active Single or Group meeting into a responsive corner dock with live screen preview when available, restore, mic mute, and explicit leave controls.
-- Right-side chat/participants panel with a mobile drawer.
+- Chat/participants/admin tools with a mobile drawer, polls, file attachments and student-list PDF export.
+- Permission-based shared audio/video playback, fixed media-dock controls, and 50% initial volume per item.
+- Owner/admin moderation, rejoin requests, raised-hand speaking queues, floating reactions and weak-network rescue mode.
+- Owner-enabled local recording and participant recording notices.
 - Responsive layouts, accessible input labels, keyboard focus, reduced-motion support, and connection/error states.
 
 ## Troubleshooting
@@ -136,6 +172,11 @@ Keep the private certificate file private. It is renewed when the detected LAN a
 - **Capture unavailable:** use desktop Chrome/Edge on localhost or a trusted HTTPS origin. Phones are receivers, not PC-screen capture sources.
 - **Voice unavailable:** allow microphone access on each device, check its input device and mic/speaker mute controls, and press a member's Hear button if browser autoplay is blocked.
 - **Code rejected:** check all six digits, matching Single/Group mode, room capacity, and whether anyone remains in the room.
+- **Name rejected:** use at least four trimmed characters and no numbers. Typing/pasting Unicode numbers into the name inputs removes them; the server also rejects numeric names.
+- **Waiting for rejoin approval:** ask an owner/admin to review the request under **Permission**; do not assume the old media session survived refresh.
+- **YouTube search unavailable:** set `YOUTUBE_API_KEY` server-side, enable YouTube Data API v3, check key restrictions/quota, and restart after changing environment variables. Search/lookup may still fail for region-, account- or embedding-restricted items.
+- **Cannot change shared playback:** the owner must enable **Allow members to manage media**. Local pause/mute is separate and does not pause everyone.
+- **No recording option or saved file:** ask the owner to allow recording, use a browser with screen capture and MediaRecorder support, and keep local browser storage available. Download important recordings; clearing site data removes local files.
 - **Port busy:** set `PORT` and/or `HTTPS_PORT` before starting. For example in PowerShell, run `$env:PORT=5174` and `$env:HTTPS_PORT=5444`, then `npm.cmd run dev`.
 
 ## Production And Tests
@@ -146,10 +187,18 @@ npm run build
 npm start
 ```
 
+`npm run test:load` runs synthetic WebSocket/signaling load scenarios. It is not a browser WebRTC media benchmark, does not measure TURN capacity, and does not establish support for 1,000 active camera/microphone participants.
+
 The production server serves `dist`; development serves Vite middleware. Local HTTP/HTTPS share one pairing service. Production defaults to HTTP behind your platform's trusted HTTPS proxy, without writing a local certificate. `/healthz` provides a health check. Restart for server/environment changes; reload after frontend edits.
 
-Tests cover pairing, cleanup, invalid/expired codes, single-viewer enforcement, reconnect-resistant guess limits, trusted public origins, STUN/TURN options and expiring relay credentials, plus production startup/endpoints. Browser checks received generated video and audio tracks over actual WebRTC, exercised system/mic mixing, mic mute/unmute, and verified source-track cleanup. Prior checks covered decoded pixels, pause and stop. Physical microphone audio, separate-network testing, Docker image execution and forced TURN validation require the corresponding hardware, tools, hosting and relay credentials and remain unverified.
+Automated tests cover pairing, cleanup, invalid/expired codes, Single/Group isolation and capacity, names without numbers, room-scoped chat/files, moderation, location disclosure, media permission grants/revocation, tab-session persistence, STUN/TURN credentials, trusted origins, rate limits and production endpoints. Run the commands above on the current checkout; do not assume a historical pass proves the latest working tree is clean.
+
+Latest local documentation check (**2026-10-20**): `npm run build` passed, and `npm test` passed 25 of 27 tests in the current working tree. Two existing assertions fail: the sound-cue test does not expect the `admission` cue, and the group-member snapshot expects the older mute/state shape without `rescueMode`. These failures are not fixed by this README update. The build also reports Vite's large-chunk warning.
+
+Prior browser checks used generated microphone/camera/screen tracks over real WebRTC, decoded received video, and checked mute, capture cleanup, simultaneous media and minimized continuity. Recent component checks covered responsive cards, picker containment, upward reactions, the AM/PM clock, number filtering, permission-based media controls and per-item 50% volume. YouTube control checks used a mocked player API; direct-media checks used generated local media. These do not prove unrestricted live YouTube playback or connectivity to the current public deployment.
+
+Physical microphone/camera hardware, separate-network testing, current public/TURN connectivity, Docker image execution and forced TURN validation require the corresponding devices, tools, hosting and relay credentials and remain unverified. This documentation update does not re-run browser or load-test scenarios.
 
 ## Stack And Privacy
 
-React, Vite, Express, `ws`, and browser WebRTC. WebSockets carry signaling; media goes directly between devices or through TURN, encrypted by WebRTC in either case. No app video or voice recordings are stored. Signaling and relay providers can see connection metadata, IP addresses and traffic volumes. A public Cloudflare STUN endpoint is used for candidate discovery. Display fonts use Google Fonts when online; artwork is local. Wallpaper: [Unsplash](https://images.unsplash.com/photo-1464822759023-fed622ff2c3b).
+React, Vite, Three.js, Express, `ws`, and browser WebRTC. WebSockets carry signaling and room events; live microphone, camera, and screen tracks go directly between devices or through TURN, encrypted by WebRTC in either case. Shared media is played separately by each browser from its provider. Optional meeting recordings are stored on the recording participant's device, not uploaded to the signaling server. Signaling and relay providers can see connection metadata, IP addresses and traffic volumes. Display names are not verified identities. A public Cloudflare STUN endpoint is used for candidate discovery. Display fonts use Google Fonts when online; artwork is local. Wallpaper: [Unsplash](https://images.unsplash.com/photo-1464822759023-fed622ff2c3b).
