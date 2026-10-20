@@ -260,6 +260,113 @@ test("groups admit multiple members, relay targeted messages and survive creator
   assert.match((await receive(third)).message, /not found/);
 });
 
+test("location disclosure is restricted to explicitly authorized owners and admins", async (context) => {
+  const { client, receive, send } = await setup(context);
+  const owner = await client();
+  const member = await client();
+  const newcomer = await client();
+  const ownerCoordinates = { latitude: 12.345678, longitude: 23.456789 };
+  const memberCoordinates = { latitude: -34.567891, longitude: 45.678912 };
+  const profileImage = "data:image/jpeg;base64,/9j/2Q==";
+  const assertNoLocation = (payload) => {
+    const inspect = (value) => {
+      if (!value || typeof value !== "object") return;
+      for (const [key, entry] of Object.entries(value)) {
+        assert.ok(!["location", "latitude", "longitude"].includes(key), `Unexpected ${key} field`);
+        inspect(entry);
+      }
+    };
+    inspect(payload);
+    const serialized = JSON.stringify(payload);
+    for (const coordinate of [...Object.values(ownerCoordinates), ...Object.values(memberCoordinates)]) {
+      assert.equal(serialized.includes(String(coordinate)), false, "Unexpected coordinate value");
+    }
+  };
+  const assertLocation = (state, memberId, coordinates) => {
+    assert.equal(state.type, "group-state");
+    const location = state.members.find((entry) => entry.id === memberId)?.location;
+    assert.deepEqual({ latitude: location?.latitude, longitude: location?.longitude }, coordinates);
+    assert.ok(Number.isFinite(location.updatedAt));
+  };
+
+  send(owner, { type: "group-create", name: "Owner" });
+  const created = await receive(owner);
+  assert.equal(created.self.role, "owner");
+  send(owner, { type: "group-location", ...ownerCoordinates });
+  assertLocation(await receive(owner), created.selfId, ownerCoordinates);
+
+  send(member, { type: "group-join", code: created.code, name: "Member", profileImage });
+  const memberJoined = await receive(member);
+  assert.equal(memberJoined.self.role, "member");
+  assertNoLocation(memberJoined);
+  assert.equal((await receive(owner)).type, "group-member-joined");
+  send(member, { type: "group-location", ...memberCoordinates });
+  const ownerState = await receive(owner);
+  assertLocation(ownerState, created.selfId, ownerCoordinates);
+  assertLocation(ownerState, memberJoined.selfId, memberCoordinates);
+  assertNoLocation(await receive(member));
+
+  send(newcomer, { type: "group-join", code: created.code, name: "Visitor" });
+  const newcomerJoined = await receive(newcomer);
+  assert.equal(newcomerJoined.self.role, "member");
+  assert.equal(newcomerJoined.members.length, 2);
+  assertNoLocation(newcomerJoined);
+  const existingMember = newcomerJoined.members.find((entry) => entry.id === memberJoined.selfId);
+  assert.equal(existingMember.name, "Member");
+  assert.equal(existingMember.role, "member");
+  assert.equal(existingMember.profileImage, profileImage);
+  const profileDelivery = await receive(newcomer);
+  assert.equal(profileDelivery.type, "group-profile-image");
+  assert.equal(profileDelivery.profileImage, profileImage);
+  assertNoLocation(profileDelivery);
+  for (const socket of [owner, member]) {
+    const notice = await receive(socket);
+    assert.equal(notice.type, "group-member-joined");
+    assertNoLocation(notice);
+  }
+
+  const allState = async () => {
+    const states = await Promise.all([owner, member, newcomer].map(receive));
+    assert.ok(states.every((state) => state.type === "group-state"));
+    return states;
+  };
+  send(member, { type: "group-location", ...memberCoordinates });
+  const initialStates = await allState();
+  assertLocation(initialStates[0], memberJoined.selfId, memberCoordinates);
+  assertNoLocation(initialStates[1]);
+  assertNoLocation(initialStates[2]);
+
+  send(owner, { type: "group-admin", action: "role", targetId: newcomerJoined.selfId, role: "admin" });
+  const promotedStates = await allState();
+  assert.equal(promotedStates[2].members.find((entry) => entry.id === newcomerJoined.selfId).role, "admin");
+  for (const state of [promotedStates[0], promotedStates[2]]) {
+    assertLocation(state, created.selfId, ownerCoordinates);
+    assertLocation(state, memberJoined.selfId, memberCoordinates);
+  }
+  assertNoLocation(promotedStates[1]);
+
+  send(owner, { type: "group-admin", action: "role", targetId: newcomerJoined.selfId, role: "member" });
+  const demotedStates = await allState();
+  assert.equal(demotedStates[2].members.find((entry) => entry.id === newcomerJoined.selfId).role, "member");
+  assertLocation(demotedStates[0], memberJoined.selfId, memberCoordinates);
+  assertNoLocation(demotedStates[1]);
+  assertNoLocation(demotedStates[2]);
+  send(member, { type: "group-location", ...memberCoordinates });
+  const updatedStates = await allState();
+  assertLocation(updatedStates[0], memberJoined.selfId, memberCoordinates);
+  assertNoLocation(updatedStates[1]);
+  assertNoLocation(updatedStates[2]);
+
+  send(member, { type: "group-media", muted: false, sharing: true, camera: true });
+  for (const socket of [owner, newcomer]) {
+    const media = await receive(socket);
+    assert.equal(media.type, "group-member-media");
+    assert.equal(media.sharing, true);
+    assert.equal(media.camera, true);
+    assertNoLocation(media);
+  }
+});
+
 test("group codes are isolated from paired sessions and enforce capacity", async (context) => {
   const { client, receive, send } = await setup(context, {
     maxGroupMembers: 2,

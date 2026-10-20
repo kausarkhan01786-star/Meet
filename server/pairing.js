@@ -29,7 +29,7 @@ export function createPairingService({
     micLocked: Boolean(socket.groupMuteLocked),
     handRaised: Boolean(socket.groupHandRaised),
     rescueMode: Boolean(socket.groupRescueMode),
-    ...(includeLocation && socket.groupLocation ? { location: socket.groupLocation } : {}),
+    ...(includeLocation === true && socket.groupLocation ? { location: socket.groupLocation } : {}),
   });
   const refreshSpeakingQueue = (group) => {
     group.speakingQueue = [...group.members.values()].filter((member) => member.groupHandRaised).sort((a, b) => (a.groupHandRaisedOrder || 0) - (b.groupHandRaisedOrder || 0)).map((member) => ({ id: member.memberId, name: member.memberName }));
@@ -280,7 +280,7 @@ export function createPairingService({
                 message: `This meeting is full (${group.limit} members).`,
               });
           }
-          const members = [...group.members.values()].map(memberInfo);
+          const members = [...group.members.values()].map((member) => memberInfo(member, false, true));
           socket.memberId = randomUUID();
           socket.memberName = memberName;
           socket.groupProfileImage = profileImage;
